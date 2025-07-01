@@ -6,10 +6,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/home";
 import NotFound from "@/pages/not-found";
 import { ChatInterface } from "./components/chatbot/chat-interface";
+import Dashboard from "./pages/dashboard";
 
 function Router() {
   return (
     <Switch>
+      <Route path=":schoolCode/dashboard" component={Dashboard} />
+      <Route path=":schoolCode" component={Home} />
       <Route path="/" component={Home} />
       <Route component={NotFound} />
     </Switch>

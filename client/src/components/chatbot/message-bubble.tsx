@@ -1,11 +1,16 @@
 import { Bot, User } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 
 interface MessageBubbleProps {
   content: string;
   isUser: boolean;
   timestamp: Date;
+  schoolCode: string;
+  availableKeywords: string[];
 }
 
 // Helper to linkify URLs and emails in a string or array of strings/JSX
@@ -83,140 +88,120 @@ function linkify(text: string | (string | JSX.Element)[]): (string | JSX.Element
   return parts;
 }
 
-// Format text content with basic markdown-like styling and linkification
-function formatMessageContent(content: string, isUser: boolean): JSX.Element {
-  if (isUser) {
-    // For user, just linkify
-    return <span>{linkify(content)}</span>;
+// Fetch image URLs from backend for keywords
+async function fetchImageUrl(keyword: string, schoolCode: string): Promise<{ url: string; alt: string } | null> {
+  try {
+    const res = await fetch(`/api/school/${schoolCode}/images?keyword=${encodeURIComponent(keyword)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.url ? { url: data.url, alt: data.alt || keyword } : null;
+  } catch {
+    return null;
   }
-
-  // Split content by lines and process each line
-  const lines = content.split('\n');
-  const elements: JSX.Element[] = [];
-  
-  lines.forEach((line, index) => {
-    const key = `line-${index}`;
-    
-    // Remove asterisk if it appears just before bold (e.g., "* **Nursery:** ...")
-    line = line.replace(/^[\s]*\*[\s]*(\*\*)/, ' $1');
-
-    // Handle headers (starting with **)
-    if (line.match(/^\*\*(.+)\*\*:?$/)) {
-      const headerText = line.replace(/^\*\*(.+)\*\*:?$/, '$1');
-      elements.push(
-        <div key={key} className="font-semibold text-school-deep mb-2 mt-3 first:mt-0">
-          {linkify(headerText)}
-        </div>
-      );
-    }
-    // Handle inline bold text within lines
-    else if (line.includes('**')) {
-      const processedLine = line.split(/(\*\*[^*]+\*\*)/).map((part, idx) => {
-        if (part.match(/^\*\*(.+)\*\*$/)) {
-          const boldText = part.replace(/^\*\*(.+)\*\*$/, '$1');
-          return <strong key={`bold-${idx}`} className="font-semibold text-school-deep">{linkify(boldText)}</strong>;
-        }
-        return linkify(part);
-      });
-      elements.push(
-        <div key={key} className="mb-1">
-          {processedLine}
-        </div>
-      );
-    }
-    // Handle bullet points (starting with * or •)
-    else if (line.match(/^[\s]*[\*•]\s+(.+)$/)) {
-      const bulletText = line.replace(/^[\s]*[\*•]\s+(.+)$/, '$1');
-      const processedBulletText = bulletText.includes('**') 
-        ? bulletText.split(/(\*\*[^*]+\*\*)/).map((part, index) => {
-            if (part.match(/^\*\*(.+)\*\*$/)) {
-              const boldText = part.replace(/^\*\*(.+)\*\*$/, '$1');
-              return <strong key={`bullet-bold-${index}`} className="font-semibold text-school-deep">{boldText}</strong>;
-            }
-            return linkify(part);
-          })
-        : linkify(bulletText);
-      
-      elements.push(
-        <div key={key} className="flex items-start ml-2 mb-1">
-          <span className="text-blue-500 mr-2 text-lg align-top">&bull;</span>
-          <span className="flex-1">{processedBulletText}</span>
-        </div>
-      );
-    }
-    // Handle nested bullet points (with indentation)
-    else if (line.match(/^[\s]{4,}[\*•]\s+(.+)$/)) {
-      const bulletText = line.replace(/^[\s]{4,}[\*•]\s+(.+)$/, '$1');
-      const processedBulletText = bulletText.includes('**') 
-        ? bulletText.split(/(\*\*[^*]+\*\*)/).map((part, idx) => {
-            if (part.match(/^\*\*(.+)\*\*$/)) {
-              const boldText = part.replace(/^\*\*(.+)\*\*$/, '$1');
-              return <strong key={`nested-bold-${idx}`} className="font-semibold text-school-deep">{linkify(boldText)}</strong>;
-            }
-            return linkify(part);
-          })
-        : linkify(bulletText);
-      
-      elements.push(
-        <div key={key} className="flex items-start ml-6 mb-1">
-          <span className="text-school-orange mr-2 mt-0.5">◦</span>
-          <span className="flex-1">{processedBulletText}</span>
-        </div>
-      );
-    }
-    // Handle emoji bullets (✅, 📸, 📜, ☝️, 🚫, etc.)
-    else if (line.match(/^[\s]*[✅📸📜☝️🚫🔗📅📞📧📝📂📁📌📍💡🔔🕒🏫👨‍🎓👩‍🎓🏆🎓📚🏅🗂️🗃️🗄️🗓️🗒️🗳️🗝️🗺️🗨️🗯️🗳️🗞️🗿🛎️🛡️🧾🧑‍🏫🧑‍🎓]\s+(.+)$/)) {
-      const match = line.match(/^[\s]*([✅📸📜☝️🚫🔗📅📞📧📝📂📁📌📍💡🔔🕒🏫👨‍🎓👩‍🎓🏆🎓📚🏅🗂️🗃️🗄️🗓️🗒️🗳️🗝️🗺️🗨️🗯️🗳️🗞️🗿🛎️🛡️🧾🧑‍🏫🧑‍🎓])\s+(.+)$/);
-      if (match) {
-        const emoji = match[1];
-        const text = match[2];
-        const processedText = text.includes('**') 
-          ? text.split(/(\*\*[^*]+\*\*)/).map((part, index) => {
-              if (part.match(/^\*\*(.+)\*\*$/)) {
-                const boldText = part.replace(/^\*\*(.+)\*\*$/, '$1');
-                return <strong key={`emoji-bold-${index}`} className="font-semibold text-school-deep">{boldText}</strong>;
-              }
-              return linkify(part);
-            })
-          : linkify(text);
-        
-        elements.push(
-          <div key={key} className="flex items-start ml-2 mb-1">
-            <span className="mr-2 mt-1 text-lg">{emoji}</span>
-            <span className="flex-1">{processedText}</span>
-          </div>
-        );
-      }
-    }
-    // Handle regular lines
-    else if (line.trim()) {
-      const processedLine = line.includes('**') 
-        ? line.split(/(\*\*[^*]+\*\*)/).map((part, idx) => {
-            if (part.match(/^\*\*(.+)\*\*$/)) {
-              const boldText = part.replace(/^\*\*(.+)\*\*$/, '$1');
-              return <strong key={`regular-bold-${idx}`} className="font-semibold text-school-deep">{linkify(boldText)}</strong>;
-            }
-            return linkify(part);
-          })
-        : linkify(line);
-      
-      elements.push(
-        <div key={key} className="mb-1">
-          {processedLine}
-        </div>
-      );
-    }
-    // Handle empty lines (spacing)
-    else {
-      elements.push(<div key={key} className="mb-2"></div>);
-    }
-  });
-
-  return <>{elements}</>;
 }
 
-export function MessageBubble({ content, isUser, timestamp }: MessageBubbleProps) {
-  const formattedContent = useMemo(() => formatMessageContent(content, isUser), [content, isUser]);
+function formatBotContent(content: string, schoolCode: string, excludeImageUrls: string[] = []): JSX.Element {
+  // Remove direct image URLs from the text if they are in excludeImageUrls
+  let processedContent = content;
+  if (excludeImageUrls.length > 0) {
+    for (const url of excludeImageUrls) {
+      processedContent = processedContent.replace(new RegExp(`(^|\s)${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=\s|$)`, 'g'), ' ');
+    }
+  }
+
+  // Use ReactMarkdown for proper markdown rendering
+  return (
+    <div className="message-bubble-custom">
+      <ReactMarkdown
+        children={processedContent}
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw]}
+        components={{
+          a: ({node, ...props}) => (
+            <a {...props} className="text-blue-700 underline" target="_blank" rel="noopener noreferrer" />
+          ),
+          strong: ({node, ...props}) => (
+            <strong {...props} className="text-blue-900" />
+          ),
+          li: ({node, ...props}) => (
+            <li {...props} className="ml-4 list-disc" />
+          ),
+        }}
+      />
+    </div>
+  );
+}
+
+function formatMessageContent(content: string, isUser: boolean, schoolCode: string, excludeImageUrls: string[] = []): JSX.Element {
+  if (isUser) {
+    return <span>{linkify(content)}</span>;
+  }
+  return formatBotContent(content, schoolCode, excludeImageUrls);
+}
+
+export function MessageBubble({ content, isUser, timestamp, schoolCode, availableKeywords }: MessageBubbleProps) {
+  const [images, setImages] = useState<JSX.Element[]>([]);
+  const [directImageUrls, setDirectImageUrls] = useState<string[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadImages() {
+      const imgs: JSX.Element[] = [];
+      const renderedUrls = new Set<string>();
+      // Keyword-based images
+      for (const keyword of availableKeywords) {
+        if (content.toLowerCase().includes(keyword.toLowerCase())) {
+          const res = await fetch(`/api/school/${schoolCode}/images?keyword=${encodeURIComponent(keyword)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.url && isMounted && !renderedUrls.has(data.url)) {
+              imgs.push(
+                <div key={keyword} className="my-2 flex justify-center">
+                  <img
+                    src={data.url}
+                    alt={data.alt || keyword}
+                    className="rounded-lg shadow max-w-xs w-full h-auto border border-gray-200"
+                    style={{ maxHeight: 107 }}
+                    loading="lazy"
+                  />
+                </div>
+              );
+              renderedUrls.add(data.url);
+            }
+          }
+        }
+      }
+      // Direct image URLs in content
+      const urlRegex = /(https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|webp))/gi;
+      let match;
+      const foundDirectUrls: string[] = [];
+      while ((match = urlRegex.exec(content)) !== null) {
+        const url = match[1];
+        if (!renderedUrls.has(url)) {
+          imgs.push(
+            <div key={url} className="my-2 flex justify-center">
+              <img
+                src={url}
+                alt={url}
+                className="rounded-lg shadow max-w-xs w-full h-auto border border-gray-200"
+                style={{ maxHeight: 107 }}
+                loading="lazy"
+              />
+            </div>
+          );
+          renderedUrls.add(url);
+          foundDirectUrls.push(url);
+        }
+      }
+      setDirectImageUrls(foundDirectUrls);
+      if (isMounted) setImages(imgs);
+    }
+    loadImages();
+    return () => { isMounted = false; };
+  }, [content, availableKeywords, schoolCode]);
+
+  // Your formatting logic for bold, bullets, etc.
+  const formattedContent = useMemo(() => formatBotContent(content, schoolCode, directImageUrls), [content, schoolCode, directImageUrls]);
 
   return (
     <div className={`flex items-start space-x-3 animate-fade-in ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`}>
@@ -226,6 +211,7 @@ export function MessageBubble({ content, isUser, timestamp }: MessageBubbleProps
       <div className={`rounded-2xl p-4 max-w-[85%] ${isUser ? 'bg-school-blue text-white rounded-tr-sm' : 'bg-gray-50 rounded-tl-sm border border-gray-200'}`}>
         <div className={`text-sm leading-relaxed ${isUser ? 'text-white' : 'text-gray-800'}`}>
           {formattedContent}
+          {images}
         </div>
         <div className={`text-xs mt-2 opacity-70 ${isUser ? 'text-white' : 'text-gray-500'}`}>
           {formatDistanceToNow(timestamp, { addSuffix: true })}

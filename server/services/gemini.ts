@@ -1,40 +1,33 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { getSchoolContext } from "./school-context";
+import { getSchoolData } from "./school-context";
 
 const genAI = new GoogleGenerativeAI(
-  process.env.GEMINI_API_KEY || "AIzaSyDiS_-3NEG95Aj3Fr4Vv_hm0EY-rr3IJ00"
+  process.env.GOOGLE_API_KEY || "AIzaSyD2u1YsYP5eWNhzREAHc3hsnLtvD0ImVKI"
 );
 
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-export async function generateResponse(userMessage: string, sessionId?: string): Promise<string> {
+export async function generateResponse(userMessage: string, sessionId?: string, schoolCode: string = "SXSBT"): Promise<string> {
   try {
-    const schoolContext = getSchoolContext();
-    
-    const systemPrompt = `You are an AI assistant for St. Xavier's School, Bathinda. You help students and parents with enquiries about the school.
+    // Fetch school context from DB using provided schoolCode
+    const schoolContext = await getSchoolData(schoolCode);
 
-IMPORTANT GUIDELINES:
-- Always be helpful, professional, and friendly
-- Provide accurate information based on the school context provided
-- Use proper formatting with emojis and bullet points for better readability
-- If you don't have specific information, direct users to contact the school
-- Always maintain the school's professional image
-- Be concise but comprehensive in your responses
+    const systemPrompt = `You are an AI assistant for a School. You help students and parents with enquiries about the school.\n\nSchool context:\n${JSON.stringify(schoolContext, null, 2)}\n\nBe concise, accurate, and helpful.Use proper formatting with emojis and bullet points for better readability.Be clear and concise but compelling in your responses. never use table to give output\n`;
 
-SCHOOL CONTEXT:
-${JSON.stringify(schoolContext, null, 2)}
-
-Please respond to the user's query in a helpful and informative way. Use the school context to provide accurate information.`;
-
-    const result = await model.generateContent([
-      { text: systemPrompt },
-      { text: `User Query: ${userMessage}` }
-    ]);
-
-    const response = await result.response;
-    return response.text();
-  } catch (error) {
-    console.error("Error generating AI response:", error);
-    return "I apologize, but I'm having trouble processing your request right now. Please try again later or contact the school directly at contactsaintxaviersbathinda@gmail.com for immediate assistance.";
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite-preview-06-17" });
+    const chat = model.startChat({
+      history: [
+        {
+          role: "user",
+          parts: [{ text: systemPrompt }],
+        },
+      ],
+      generationConfig: {
+        maxOutputTokens: 2048,
+      },
+    });
+    const result = await chat.sendMessage(userMessage);
+    return result.response.text();
+  } catch (err) {
+    console.error("Gemini error:", err);
+    return "Sorry, there was an error generating a response.";
   }
 }

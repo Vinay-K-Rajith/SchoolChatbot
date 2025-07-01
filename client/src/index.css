@@ -120,6 +120,11 @@
   .animate-fade-in {
     animation: fade-in 0.3s ease-out;
   }
+
+  .message-bubble-markdown strong {
+    color: #1e3a8a; /* Tailwind blue-900 */
+    font-weight: 700;
+  }
 }
 
 @keyframes bounce-gentle {

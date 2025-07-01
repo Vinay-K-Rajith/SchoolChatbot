@@ -21,8 +21,7 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: path.resolve(__dirname, "client/index.html"),
-        widget: path.resolve(__dirname, "client/widget.html"),
+        widget: path.resolve(__dirname, 'client/widget.html'),
       }
     },
   },

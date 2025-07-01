@@ -1,0 +1,399 @@
+  "feeStructure": {
+    "classes": {
+      "NURSERY": {
+        "admissionFee": 1000,
+        "quarters": {
+          "APR-JUNE": {
+            "tuitionFee": 10335,
+            "smartClasses": 615,
+            "campusCare": 360,
+            "amalgamatedFee": 2275,
+            "total": 12310
+          },
+          "JULY-SEPT": {
+            "tuitionFee": 10335,
+            "smartClasses": 615,
+            "campusCare": 360,
+            "amalgamatedFee": 2275,
+            "total": 13585
+          },
+          "OCT-DEC": {
+            "tuitionFee": 10335,
+            "smartClasses": 615,
+            "campusCare": 360,
+            "amalgamatedFee": 2275,
+            "total": 13585
+          },
+          "JAN-MAR": {
+            "tuitionFee": 10335,
+            "smartClasses": 615,
+            "campusCare": 360,
+            "amalgamatedFee": 1400,
+            "total": 11310
+          }
+        },
+        "grandTotal": 50790
+      },
+      "L.K.G": {
+        "admissionFee": 1000,
+        "quarters": {
+          "APR-JUNE": {
+            "tuitionFee": 10335,
+            "smartClasses": 615,
+            "campusCare": 360,
+            "amalgamatedFee": 2275,
+            "total": 12310
+          },
+          "JULY-SEPT": {
+            "tuitionFee": 10335,
+            "smartClasses": 615,
+            "campusCare": 360,
+            "amalgamatedFee": 2275,
+            "total": 13585
+          },
+          "OCT-DEC": {
+            "tuitionFee": 10335,
+            "smartClasses": 615,
+            "campusCare": 360,
+            "amalgamatedFee": 2275,
+            "total": 13585
+          },
+          "JAN-MAR": {
+            "tuitionFee": 10335,
+            "smartClasses": 615,
+            "campusCare": 360,
+            "amalgamatedFee": 1400,
+            "total": 11310
+          }
+        },
+        "grandTotal": 50790
+      },
+      "U.K.G": {
+        "quarters": {
+          "APR-JUNE": {
+            "tuitionFee": 10335,
+            "smartClasses": 540,
+            "campusCare": 345,
+            "amalgamatedFee": 2200,
+            "total": 13420
+          },
+          "JULY-SEPT": {
+            "tuitionFee": 10335,
+            "smartClasses": 540,
+            "campusCare": 345,
+            "amalgamatedFee": 2200,
+            "total": 11220
+          },
+          "OCT-DEC": {
+            "tuitionFee": 10335,
+            "smartClasses": 540,
+            "campusCare": 345,
+            "amalgamatedFee": 2200,
+            "total": 13420
+          },
+          "JAN-MAR": {
+            "tuitionFee": 10335,
+            "smartClasses": 540,
+            "campusCare": 345,
+            "amalgamatedFee": 2200,
+            "total": 11220
+          }
+        },
+        "grandTotal": 49280
+      },
+      "I": {
+        "quarters": {
+          "APR-JUNE": {
+            "tuitionFee": 9390,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2100,
+            "total": 12405
+          },
+          "JULY-SEPT": {
+            "tuitionFee": 9390,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2100,
+            "total": 10360
+          },
+          "OCT-DEC": {
+            "tuitionFee": 9390,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2100,
+            "total": 12405
+          },
+          "JAN-MAR": {
+            "tuitionFee": 9390,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2100,
+            "total": 10360
+          }
+        },
+        "grandTotal": 45420
+      },
+      "II": {
+        "quarters": {
+          "APR-JUNE": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2100,
+            "total": 11925
+          },
+          "JULY-SEPT": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2100,
+            "total": 9825
+          },
+          "OCT-DEC": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2100,
+            "total": 11925
+          },
+          "JAN-MAR": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2100,
+            "total": 9825
+          }
+        },
+        "grandTotal": 43500
+      },
+      "III": {
+        "quarters": {
+          "APR-JUNE": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2100,
+            "computerFee": 255,
+            "total": 11925
+          },
+          "JULY-SEPT": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2100,
+            "computerFee": 255,
+            "total": 9825
+          },
+          "OCT-DEC": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2100,
+            "computerFee": 255,
+            "total": 11925
+          },
+          "JAN-MAR": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2100,
+            "computerFee": 255,
+            "total": 9825
+          }
+        },
+        "grandTotal": 43500
+      },
+      "IV-V": {
+        "quarters": {
+          "APR-JUNE": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2180,
+            "computerFee": 255,
+            "total": 12260
+          },
+          "JULY-SEPT": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2180,
+            "computerFee": 255,
+            "total": 10080
+          },
+          "OCT-DEC": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2180,
+            "computerFee": 255,
+            "total": 12260
+          },
+          "JAN-MAR": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2180,
+            "computerFee": 255,
+            "total": 10080
+          }
+        },
+        "grandTotal": 44680
+      },
+      "VI-VIII": {
+        "quarters": {
+          "APR-JUNE": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2470,
+            "computerFee": 255,
+            "total": 12550
+          },
+          "JULY-SEPT": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2470,
+            "computerFee": 255,
+            "total": 10080
+          },
+          "OCT-DEC": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2470,
+            "computerFee": 255,
+            "total": 12550
+          },
+          "JAN-MAR": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2470,
+            "computerFee": 255,
+            "total": 10080
+          }
+        },
+        "grandTotal": 45260
+      },
+      "IX-X": {
+        "quarters": {
+          "APR-JUNE": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2673,
+            "computerFee": 255,
+            "total": 12753
+          },
+          "JULY-SEPT": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2673,
+            "computerFee": 255,
+            "total": 10080
+          },
+          "OCT-DEC": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2673,
+            "computerFee": 255,
+            "total": 12753
+          },
+          "JAN-MAR": {
+            "tuitionFee": 8910,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2673,
+            "computerFee": 255,
+            "total": 10080
+          }
+        },
+        "grandTotal": 45666
+      },
+      "XI": {
+        "quarters": {
+          "APR-JUNE": {
+            "tuitionFee": 9570,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2455,
+            "computerFee": 330,
+            "total": 10815
+          },
+          "JULY-SEPT": {
+            "tuitionFee": 9570,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2455,
+            "computerFee": 330,
+            "total": 13270
+          },
+          "OCT-DEC": {
+            "tuitionFee": 9570,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2455,
+            "computerFee": 330,
+            "total": 10815
+          },
+          "JAN-MAR": {
+            "tuitionFee": 9570,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2455,
+            "computerFee": 330,
+            "total": 13270
+          }
+        },
+        "grandTotal": 48170
+      },
+      "XII": {
+        "quarters": {
+          "APR-JUNE": {
+            "tuitionFee": 9570,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2455,
+            "computerFee": 300,
+            "total": 10785
+          },
+          "JULY-SEPT": {
+            "tuitionFee": 9570,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2455,
+            "computerFee": 300,
+            "total": 13240
+          },
+          "OCT-DEC": {
+            "tuitionFee": 9570,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2455,
+            "computerFee": 300,
+            "total": 10785
+          },
+          "JAN-MAR": {
+            "tuitionFee": 9570,
+            "smartClasses": 570,
+            "campusCare": 345,
+            "amalgamatedFee": 2455,
+            "computerFee": 300,
+            "total": 13240
+          }
+        },
+        "grandTotal": 48050
+      }
+    },
+    "note": "Fees are subject to change; transportation and books excluded",
+    "rules": [
+      "Fees to be paid quarterly by due dates",
+      "Late payment incurs a fine of ₹100 per week",
+      "No refund of admission or security deposit"
+    ]
+  } 

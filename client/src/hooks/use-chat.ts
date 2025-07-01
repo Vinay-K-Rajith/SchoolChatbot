@@ -12,6 +12,7 @@ interface ChatResponse {
 export function useChat() {
   const [sessionId, setSessionId] = useState<string>("");
   const queryClient = useQueryClient();
+  const schoolCode = "SXSBT"; // TODO: Make dynamic if needed
 
   // Create session on mount
   useEffect(() => {
@@ -44,10 +45,11 @@ export function useChat() {
 
   // Send message mutation
   const sendMessageMutation = useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async ({ content, schoolCode }: { content: string; schoolCode: string }) => {
       const response = await apiRequest("POST", "/api/chat/message", {
         sessionId,
         content,
+        schoolCode,
       });
       return response.json() as Promise<ChatResponse>;
     },
@@ -62,11 +64,10 @@ export function useChat() {
     },
   });
 
-  const sendMessage = async (content: string) => {
+  const sendMessage = async (content: string, codeOverride?: string) => {
     if (!sessionId || !content.trim()) return;
-    
     try {
-      await sendMessageMutation.mutateAsync(content);
+      await sendMessageMutation.mutateAsync({ content, schoolCode: codeOverride || schoolCode });
     } catch (error) {
       console.error("Failed to send message:", error);
     }

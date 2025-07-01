@@ -7,6 +7,8 @@ export interface IStorage {
   createChatSession(session: InsertChatSession): Promise<ChatSession>;
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessages(sessionId: string): Promise<ChatMessage[]>;
+  getAllChatSessions(): ChatSession[];
+  getAllChatMessages(): ChatMessage[];
 }
 
 export class MemStorage implements IStorage {
@@ -72,6 +74,14 @@ export class MemStorage implements IStorage {
 
   async getChatMessages(sessionId: string): Promise<ChatMessage[]> {
     return this.chatMessages.get(sessionId) || [];
+  }
+
+  getAllChatSessions(): ChatSession[] {
+    return Array.from(this.chatSessions.values());
+  }
+
+  getAllChatMessages(): ChatMessage[] {
+    return Array.from(this.chatMessages.values()).flat();
   }
 }
 

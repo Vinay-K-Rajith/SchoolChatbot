@@ -60,6 +60,12 @@ var MemStorage = class {
   async getChatMessages(sessionId) {
     return this.chatMessages.get(sessionId) || [];
   }
+  getAllChatSessions() {
+    return Array.from(this.chatSessions.values());
+  }
+  getAllChatMessages() {
+    return Array.from(this.chatMessages.values()).flat();
+  }
 };
 var storage = new MemStorage();
 
@@ -67,156 +73,48 @@ var storage = new MemStorage();
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // server/services/school-context.ts
-function getSchoolContext() {
-  return {
-    school: {
-      name: "St. Xavier's School, Bathinda",
-      established: 1983,
-      affiliation: "Society of Pilar, Punjab - Haryana (branch of Society of Pilar, GOA)",
-      curriculum: "Central Board of Secondary Education (CBSE), Delhi",
-      mediumOfInstruction: "English",
-      additionalLanguages: ["Punjabi", "Hindi", "Sanskrit"],
-      email: "contactsaintxaviersbathinda@gmail.com",
-      website: "www.xavierbathinda.com",
-      transportation: "Not provided by school",
-      history: "Originally an all-boys school, opened to girls in April 1990",
-      mission: "All-round development of the child, especially moral and intellectual qualities",
-      facilities: [
-        "Computer Science",
-        "Classical Dance",
-        "Music",
-        "Dispensaries",
-        "Grihini Schools",
-        "Orphanages",
-        "Balwadis"
-      ]
-    },
-    admissions2025_2026: {
-      classes: {
-        nursery: {
-          ageEligibility: "DOB from 01.04.2021 to 31.03.2022",
-          note: "Candidate will NOT be eligible if outside specified age limit"
-        },
-        lkg: {
-          ageEligibility: "DOB from 01.04.2020 to 31.03.2021",
-          note: "Candidate will NOT be eligible if outside specified age limit"
-        }
-      },
-      registrationFee: "Rs. 1000/- (non-refundable)",
-      selectionProcess: "Draw of lots (conducted online)",
-      priorities: [
-        "Children of Staff Members (if basic criteria fulfilled)",
-        "Christian Minority community children",
-        "Other applications by draw of lots"
-      ]
-    },
-    requiredDocuments: {
-      essential: [
-        "Date of Birth Certificate (Municipal Corporation issued)",
-        "Baptism Certificate (for Christian children only)",
-        "Parents' Qualification Certificates and Aadhaar Card",
-        "Proof of residence (any one of the following)"
-      ],
-      proofOfResidence: [
-        "Voter ID Card",
-        "Electricity Bill",
-        "Aadhaar Card",
-        "Ration Card",
-        "Passport",
-        "Rent Deed (if staying on rent)"
-      ],
-      photographs: {
-        requirements: [
-          "Latest photograph of candidate (taken within one month)",
-          "Individual photographs of both parents",
-          "Family photograph (showing both parents and candidate)",
-          "Red background, JPG format, size less than 20KB"
-        ]
-      },
-      attestation: "All photocopies must be attested by Class A Gazetted Officer only (No Notary attested copies accepted)",
-      singleParent: {
-        divorce: "Divorce Decree",
-        separated: "Legal Separation Document",
-        widowWidower: "Death Certificate of spouse",
-        adoption: "Adoption Decree"
-      }
-    },
-    feeStructure: {
-      fees: "The fee structure for the academic session 2024-25 at St. Xavier's School, Bathinda, provides a detailed financial roadmap for parents across various classes, beginning with LKG, which mandates an initial non-refundable admission fee of \u20B95,000, a non-refundable development fee of \u20B97,000, and a refundable security deposit of \u20B91,000 to secure a place, followed by a quarterly fee schedule that starts with \u20B920,420 from April to June and continues with \u20B915,990 for each of the subsequent quarters\u2014July-September, October-December, and January-March. These quarterly payments encompass an annual amalgamated fee of \u20B94,430, a tuition fee of \u20B915,090, a smart class and Entab fee of \u20B9600, and air conditioner and running costs of \u20B9300, reflecting the school's investment in infrastructure and educational resources. Similarly, UKG follows an identical quarterly fee structure with no admission or development fees but includes the same \u20B91,000 refundable security deposit, maintaining the same breakdown of \u20B920,420 for April-June and \u20B915,990 for the remaining quarters, covering the same annual fee components to ensure consistency in early education costs. Moving to Class I, the total fee rises to \u20B920,570 for April-June and \u20B916,140 for the following quarters, incorporating an amalgamated fee of \u20B94,430, a tuition fee of \u20B915,090, a smart class and Entab fee of \u20B9600, a computer fee of \u20B9150 to support technological learning, and air conditioner costs of \u20B9300 annually, indicating an incremental increase in educational services. Class II adjusts the tuition fee to \u20B912,240 annually, resulting in a total of \u20B917,720 for April-June and \u20B913,290 for other quarters, while retaining the same additional fees as Class I, suggesting a slight reduction in tuition as the curriculum evolves. Class III escalates the initial payment to \u20B918,820 for April-June and \u20B98,850 for subsequent quarters, with a tuition fee of \u20B97,800, alongside smart class and Entab fees of \u20B9600, computer fees of \u20B9150, and air conditioner costs of \u20B9300 annually, reflecting a balanced approach to fee distribution. Class IV further modifies the structure with a total of \u20B913,780 for April-June and \u20B99,300 for other quarters, featuring a tuition fee of \u20B98,550, with the same additional fees, indicating a stabilization in costs as students progress. Classes V-VI and VII-X maintain a tuition fee of \u20B98,550, with totals of \u20B913,830 and \u20B913,890 respectively for April-June, and \u20B99,300 for other quarters, including smart class and Entab fees of \u20B9600 and computer fees of \u20B9150, showing a consistent fee model for middle and higher grades. For Class XI, Xavierites are required to pay a \u20B95,000 admission fee, with quarterly fees of \u20B918,590 for April-June and \u20B912,180 for other quarters, comprising an amalgamated fee of \u20B96,410, a tuition fee of \u20B911,580, and a smart class fee of \u20B9600, while Non-Xavierites face additional non-refundable development fee of \u20B95,000 and a refundable security deposit of \u20B91,000, aligning their quarterly totals with Xavierites. Class XII follows the same fee pattern as Xavierites in Class XI, with quarterly fees of \u20B918,590 for April-June and \u20B912,180 for other quarters, covering the same fee heads. This extensive and meticulously designed fee structure ensures transparency and predictability for parents, accommodating the diverse needs and stages of education from pre-primary to senior secondary levels at St. Xavier's School, Bathinda.",
-      note: "Fee structure available on school website www.xavierbathinda.com",
-      rules: [
-        "Initial payment at admission in cash/online",
-        "Caution money refundable when pupil leaves (after due deductions)",
-        "Fees once paid are not refundable",
-        "Penalty for delay in payment",
-        "School reserves right to modify/enhance fees by minimum 10% annually",
-        "One month notice required for withdrawal"
-      ]
-    },
-    academicInfo: {
-      gradingSystem: {
-        "91-100": "A1 (10.0)",
-        "81-90": "A2 (9.0)",
-        "71-80": "B1 (8.0)",
-        "61-70": "B2 (7.0)",
-        "51-60": "C1 (6.0)",
-        "41-50": "C2 (5.0)",
-        "33-40": "D (4.0)",
-        "21-32": "E1",
-        "00-20": "E2"
-      },
-      promotionCriteria: "Minimum D grade in each subject required for promotion",
-      subjects: [
-        "Computer Science",
-        "Classical Dance",
-        "Music",
-        "Punjabi",
-        "Hindi",
-        "Sanskrit"
-      ]
-    },
-    importantNotes: [
-      "Only one form per candidate accepted",
-      "Duplicate forms will be rejected",
-      "School does not accept donations for admissions",
-      "Be aware of third parties making false claims",
-      "NEP 2020 implementation may require additional fees",
-      "School not responsible if candidate found underage as per NEP 2020"
-    ]
-  };
+import { MongoClient } from "mongodb";
+var uri = "mongodb+srv://vaishakhp11:PiPa7LUEZ5ufQo8z@cluster0.toscmfj.mongodb.net/";
+var client = new MongoClient(uri);
+async function getSchoolData(schoolCode) {
+  await client.connect();
+  const db = client.db("test");
+  const collection = db.collection("school_data");
+  const school = await collection.findOne({ schoolCode });
+  return school;
 }
 
 // server/services/gemini.ts
 var genAI = new GoogleGenerativeAI(
-  process.env.GEMINI_API_KEY || "AIzaSyDiS_-3NEG95Aj3Fr4Vv_hm0EY-rr3IJ00"
+  process.env.GOOGLE_API_KEY || "AIzaSyD2u1YsYP5eWNhzREAHc3hsnLtvD0ImVKI"
 );
-var model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-async function generateResponse(userMessage, sessionId) {
+async function generateResponse(userMessage, sessionId, schoolCode = "SXSBT") {
   try {
-    const schoolContext = getSchoolContext();
-    const systemPrompt = `You are an AI assistant for St. Xavier's School, Bathinda. You help students and parents with enquiries about the school.
+    const schoolContext = await getSchoolData(schoolCode);
+    const systemPrompt = `You are an AI assistant for a School. You help students and parents with enquiries about the school.
 
-IMPORTANT GUIDELINES:
-- Always be helpful, professional, and friendly
-- Provide accurate information based on the school context provided
-- Use proper formatting with emojis and bullet points for better readability
-- If you don't have specific information, direct users to contact the school
-- Always maintain the school's professional image
-- Be concise but comprehensive in your responses
-
-SCHOOL CONTEXT:
+School context:
 ${JSON.stringify(schoolContext, null, 2)}
 
-Please respond to the user's query in a helpful and informative way. Use the school context to provide accurate information.`;
-    const result = await model.generateContent([
-      { text: systemPrompt },
-      { text: `User Query: ${userMessage}` }
-    ]);
-    const response = await result.response;
-    return response.text();
-  } catch (error) {
-    console.error("Error generating AI response:", error);
-    return "I apologize, but I'm having trouble processing your request right now. Please try again later or contact the school directly at contactsaintxaviersbathinda@gmail.com for immediate assistance.";
+Be concise, accurate, and helpful.Use proper formatting with emojis and bullet points for better readability.Be clear and concise but compelling in your responses. never use table to give output
+`;
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite-preview-06-17" });
+    const chat = model.startChat({
+      history: [
+        {
+          role: "user",
+          parts: [{ text: systemPrompt }]
+        }
+      ],
+      generationConfig: {
+        maxOutputTokens: 2048
+      }
+    });
+    const result = await chat.sendMessage(userMessage);
+    return result.response.text();
+  } catch (err) {
+    console.error("Gemini error:", err);
+    return "Sorry, there was an error generating a response.";
   }
 }
 
@@ -235,7 +133,7 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/chat/message", async (req, res) => {
     try {
-      const { sessionId, content } = req.body;
+      const { sessionId, content, schoolCode = "SXSBT" } = req.body;
       if (!sessionId || !content) {
         return res.status(400).json({ error: "Session ID and content are required" });
       }
@@ -244,7 +142,7 @@ async function registerRoutes(app2) {
         content,
         isUser: true
       });
-      const aiResponse = await generateResponse(content, sessionId);
+      const aiResponse = await generateResponse(content, sessionId, schoolCode);
       const aiMessage = await storage.createChatMessage({
         sessionId,
         content: aiResponse,
@@ -268,6 +166,80 @@ async function registerRoutes(app2) {
       console.error("Error fetching chat history:", error);
       res.status(500).json({ error: "Failed to fetch chat history" });
     }
+  });
+  app2.get("/api/school/:schoolCode", async (req, res) => {
+    const { schoolCode } = req.params;
+    try {
+      const school = await getSchoolData(schoolCode);
+      if (!school) return res.status(404).json({ error: "School not found" });
+      res.json(school);
+    } catch (err) {
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+  app2.get("/api/school/:schoolCode/images", async (req, res) => {
+    const { schoolCode } = req.params;
+    try {
+      const school = await getSchoolData(schoolCode);
+      if (!school) return res.status(404).json({ error: "School not found" });
+      const images = (school.school?.images || []).map((img) => ({
+        url: img.url || img,
+        alt: img.alt || img.caption || "School image"
+      }));
+      res.json({ images });
+    } catch (err) {
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+  app2.get("/api/school/:schoolCode/image-keywords", async (req, res) => {
+    const { schoolCode } = req.params;
+    try {
+      const school = await getSchoolData(schoolCode);
+      if (!school) return res.status(404).json({ error: "School not found" });
+      const keywords = (school.school?.images || []).map((img) => img.keyword || img.alt || img.caption || null).filter(Boolean);
+      res.json({ keywords });
+    } catch (err) {
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+  app2.get("/api/school/:schoolCode/analytics", async (req, res) => {
+    const { schoolCode } = req.params;
+    const { timeframe = "hourly" } = req.query;
+    const now = /* @__PURE__ */ new Date();
+    let data = [];
+    if (timeframe === "hourly") {
+      data = Array.from({ length: 24 }, (_, i) => ({ label: `${i}:00`, value: Math.floor(Math.random() * 20) }));
+    } else if (timeframe === "daily") {
+      data = Array.from({ length: 7 }, (_, i) => ({ label: `Day ${i + 1}`, value: Math.floor(Math.random() * 100) }));
+    } else if (timeframe === "weekly") {
+      data = Array.from({ length: 4 }, (_, i) => ({ label: `Week ${i + 1}`, value: Math.floor(Math.random() * 200) }));
+    } else if (timeframe === "monthly") {
+      data = Array.from({ length: 12 }, (_, i) => ({ label: `Month ${i + 1}`, value: Math.floor(Math.random() * 500) }));
+    } else if (timeframe === "yearly") {
+      data = Array.from({ length: 5 }, (_, i) => ({ label: `${now.getFullYear() - 4 + i}`, value: Math.floor(Math.random() * 1e3) }));
+    }
+    res.json({ data });
+  });
+  app2.post("/api/school/:schoolCode/knowledge-base", async (req, res) => {
+    const { schoolCode } = req.params;
+    const { text, image } = req.body;
+    res.json({ success: true, message: `Knowledge base updated for ${schoolCode}` });
+  });
+  app2.get("/api/school/:schoolCode/metrics", async (req, res) => {
+    const { schoolCode } = req.params;
+    const allSessions = storage.getAllChatSessions();
+    const allMessages = storage.getAllChatMessages();
+    const totalSessions = allSessions.length;
+    const totalMessages = allMessages.filter((m) => m.isUser).length;
+    const userIds = new Set(allMessages.filter((m) => m.isUser).map((m) => m.sessionId));
+    const totalUsers = userIds.size;
+    res.json({ totalMessages, totalSessions, totalUsers });
+  });
+  app2.get("/api/school/:schoolCode/recent-activity", async (req, res) => {
+    const { schoolCode } = req.params;
+    const allMessages = storage.getAllChatMessages();
+    const recent = allMessages.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
+    res.json({ recent });
   });
   const httpServer = createServer(app2);
   return httpServer;
@@ -301,7 +273,6 @@ var vite_config_default = defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: path.resolve(__dirname, "client/index.html"),
         widget: path.resolve(__dirname, "client/widget.html")
       }
     }
@@ -423,8 +394,8 @@ app.use((req, res, next) => {
   } else {
     serveStatic(app);
   }
-  const port = 5e3;
-  server.listen(5e3, "127.0.0.1", () => {
-    console.log("Server running on http://127.0.0.1:5000");
+  const port = 5173;
+  server.listen(5173, "127.0.0.1", () => {
+    console.log("Server running on http://127.0.0.1:5173");
   });
 })();
