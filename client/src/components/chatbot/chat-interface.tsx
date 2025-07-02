@@ -17,8 +17,9 @@ interface ChatInterfaceProps {
 
 export function ChatInterface({ isOpen, onClose, schoolCode }: ChatInterfaceProps) {
   const [message, setMessage] = useState("");
-  const { messages, sendMessage, isLoading, sessionId } = useChat();
+  const { messages, sendMessage, isLoading, sessionId } = useChat(schoolCode);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const lastMessageRef = useRef<HTMLDivElement>(null);
   const [school, setSchool] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [images, setImages] = useState<{ url: string; alt: string }[]>([]);
@@ -51,6 +52,12 @@ export function ChatInterface({ isOpen, onClose, schoolCode }: ChatInterfaceProp
       if (scrollElement) {
         scrollElement.scrollTop = scrollElement.scrollHeight;
       }
+    }
+  }, [messages, isLoading]);
+
+  useEffect(() => {
+    if (lastMessageRef.current) {
+      lastMessageRef.current.scrollIntoView({ block: "start" });
     }
   }, [messages, isLoading]);
 
@@ -101,15 +108,19 @@ export function ChatInterface({ isOpen, onClose, schoolCode }: ChatInterfaceProp
               schoolCode={schoolCode}
               availableKeywords={availableKeywords}
             />
-            {messages.map((msg) => (
-              <MessageBubble
+            {messages.map((msg, idx) => (
+              <div
                 key={msg.id}
-                content={msg.content}
-                isUser={msg.isUser}
-                timestamp={msg.timestamp ? new Date(msg.timestamp) : new Date()}
-                schoolCode={schoolCode}
-                availableKeywords={availableKeywords}
-              />
+                ref={idx === messages.length - 1 ? lastMessageRef : undefined}
+              >
+                <MessageBubble
+                  content={msg.content}
+                  isUser={msg.isUser}
+                  timestamp={msg.timestamp ? new Date(msg.timestamp) : new Date()}
+                  schoolCode={schoolCode}
+                  availableKeywords={availableKeywords}
+                />
+              </div>
             ))}
             {isLoading && <TypingIndicator />}
           </div>

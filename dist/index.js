@@ -36,6 +36,7 @@ var MemStorage = class {
     const session = {
       id: Date.now(),
       sessionId: insertSession.sessionId,
+      schoolCode: insertSession.schoolCode,
       createdAt: /* @__PURE__ */ new Date(),
       updatedAt: /* @__PURE__ */ new Date()
     };
@@ -44,9 +45,12 @@ var MemStorage = class {
     return session;
   }
   async createChatMessage(insertMessage) {
+    const session = this.chatSessions.get(insertMessage.sessionId);
+    const schoolCode = insertMessage.schoolCode || (session ? session.schoolCode : "");
     const message = {
       id: this.currentMessageId++,
       sessionId: insertMessage.sessionId,
+      schoolCode,
       content: insertMessage.content,
       isUser: insertMessage.isUser,
       timestamp: /* @__PURE__ */ new Date(),
@@ -66,6 +70,12 @@ var MemStorage = class {
   getAllChatMessages() {
     return Array.from(this.chatMessages.values()).flat();
   }
+  getAllChatSessionsBySchool(schoolCode) {
+    return Array.from(this.chatSessions.values()).filter((s) => s.schoolCode === schoolCode);
+  }
+  getAllChatMessagesBySchool(schoolCode) {
+    return Array.from(this.chatMessages.values()).flat().filter((m) => m.schoolCode === schoolCode);
+  }
 };
 var storage = new MemStorage();
 
@@ -82,6 +92,36 @@ async function getSchoolData(schoolCode) {
   const collection = db.collection("school_data");
   const school = await collection.findOne({ schoolCode });
   return school;
+}
+async function getAllSessionsBySchool(schoolCode) {
+  await client.connect();
+  const db = client.db("test");
+  const collection = db.collection("chat_sessions");
+  return collection.find({ schoolCode }).toArray();
+}
+async function getMessagesBySession(sessionId, schoolCode) {
+  await client.connect();
+  const db = client.db("test");
+  const collection = db.collection("chat_messages");
+  return collection.find({ sessionId, schoolCode }).toArray();
+}
+async function storeSession(session) {
+  await client.connect();
+  const db = client.db("test");
+  const collection = db.collection("chat_sessions");
+  await collection.insertOne(session);
+}
+async function storeMessage(message) {
+  await client.connect();
+  const db = client.db("test");
+  const collection = db.collection("chat_messages");
+  await collection.insertOne(message);
+}
+async function countMessagesBySession(sessionId, schoolCode) {
+  await client.connect();
+  const db = client.db("test");
+  const collection = db.collection("chat_messages");
+  return collection.countDocuments({ sessionId, schoolCode });
 }
 
 // server/services/gemini.ts
@@ -117,14 +157,64 @@ Be concise, accurate, and helpful.Use proper formatting with emojis and bullet p
     return "Sorry, there was an error generating a response.";
   }
 }
+async function updateKnowledgeBaseWithGemini(currentKnowledgeBase, newInput) {
+  try {
+    const systemPrompt = `You are an expert school admin assistant. Here is the current knowledge base for the school as JSON:
+${JSON.stringify(currentKnowledgeBase, null, 2)}
+
+Here is new information to add or update (text and optional image URL):
+${JSON.stringify(newInput, null, 2)}
+
+Return the updated knowledge base as a JSON object. Only return valid JSON, no explanations.`;
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite-preview-06-17" });
+    const chat = model.startChat({
+      history: [
+        {
+          role: "user",
+          parts: [{ text: systemPrompt }]
+        }
+      ],
+      generationConfig: {
+        maxOutputTokens: 2048
+      }
+    });
+    const result = await chat.sendMessage("Update the knowledge base.");
+    const text = result.response.text();
+    const jsonStart = text.indexOf("{");
+    const jsonEnd = text.lastIndexOf("}");
+    if (jsonStart !== -1 && jsonEnd !== -1) {
+      const jsonString = text.substring(jsonStart, jsonEnd + 1);
+      return JSON.parse(jsonString);
+    }
+    throw new Error("No valid JSON in Gemini response");
+  } catch (err) {
+    console.error("Gemini knowledge base update error:", err);
+    throw err;
+  }
+}
 
 // server/routes.ts
 import { nanoid } from "nanoid";
+import { MongoClient as MongoClient2 } from "mongodb";
+import requestIp from "request-ip";
+var schoolViews = {};
+var schoolActiveViewers = {};
+function trackView(schoolCode, viewerId) {
+  schoolViews[schoolCode] = (schoolViews[schoolCode] || 0) + 1;
+  if (!schoolActiveViewers[schoolCode]) schoolActiveViewers[schoolCode] = /* @__PURE__ */ new Set();
+  schoolActiveViewers[schoolCode].add(viewerId);
+  setTimeout(() => {
+    schoolActiveViewers[schoolCode]?.delete(viewerId);
+  }, 10 * 60 * 1e3);
+}
 async function registerRoutes(app2) {
   app2.post("/api/chat/session", async (req, res) => {
     try {
       const sessionId = nanoid();
-      const session = await storage.createChatSession({ sessionId });
+      const schoolCode = req.body.schoolCode || "SXSBT";
+      const ip = requestIp.getClientIp(req) || req.ip || null;
+      const session = await storage.createChatSession({ sessionId, schoolCode });
+      await storeSession({ sessionId, schoolCode, createdAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date(), ip });
       res.json({ sessionId: session.sessionId });
     } catch (error) {
       console.error("Error creating chat session:", error);
@@ -139,15 +229,19 @@ async function registerRoutes(app2) {
       }
       const userMessage = await storage.createChatMessage({
         sessionId,
+        schoolCode,
         content,
         isUser: true
       });
+      await storeMessage({ sessionId, schoolCode, content, isUser: true, timestamp: /* @__PURE__ */ new Date() });
       const aiResponse = await generateResponse(content, sessionId, schoolCode);
       const aiMessage = await storage.createChatMessage({
         sessionId,
+        schoolCode,
         content: aiResponse,
         isUser: false
       });
+      await storeMessage({ sessionId, schoolCode, content: aiResponse, isUser: false, timestamp: /* @__PURE__ */ new Date() });
       res.json({
         userMessage,
         aiMessage
@@ -205,6 +299,7 @@ async function registerRoutes(app2) {
   app2.get("/api/school/:schoolCode/analytics", async (req, res) => {
     const { schoolCode } = req.params;
     const { timeframe = "hourly" } = req.query;
+    const allMessages = storage.getAllChatMessagesBySchool(schoolCode);
     const now = /* @__PURE__ */ new Date();
     let data = [];
     if (timeframe === "hourly") {
@@ -223,23 +318,82 @@ async function registerRoutes(app2) {
   app2.post("/api/school/:schoolCode/knowledge-base", async (req, res) => {
     const { schoolCode } = req.params;
     const { text, image } = req.body;
-    res.json({ success: true, message: `Knowledge base updated for ${schoolCode}` });
+    try {
+      const school = await getSchoolData(schoolCode);
+      const currentKnowledgeBase = school?.knowledgeBase || {};
+      const updatedKnowledgeBase = await updateKnowledgeBaseWithGemini(currentKnowledgeBase, { text, image });
+      const uri2 = "mongodb+srv://vaishakhp11:PiPa7LUEZ5ufQo8z@cluster0.toscmfj.mongodb.net/";
+      const client2 = new MongoClient2(uri2);
+      await client2.connect();
+      const db = client2.db("test");
+      const collection = db.collection("school_data");
+      await collection.updateOne(
+        { schoolCode },
+        { $set: { knowledgeBase: updatedKnowledgeBase } }
+      );
+      res.json({ success: true, message: `Knowledge base updated for ${schoolCode}`, knowledgeBase: updatedKnowledgeBase });
+    } catch (err) {
+      console.error("Knowledge base update error:", err);
+      res.status(500).json({ error: "Failed to update knowledge base" });
+    }
   });
   app2.get("/api/school/:schoolCode/metrics", async (req, res) => {
     const { schoolCode } = req.params;
-    const allSessions = storage.getAllChatSessions();
-    const allMessages = storage.getAllChatMessages();
+    const viewerId = req.ip + (req.headers["user-agent"] || "");
+    trackView(schoolCode, viewerId);
+    const allSessions = storage.getAllChatSessionsBySchool(schoolCode);
+    const allMessages = storage.getAllChatMessagesBySchool(schoolCode);
     const totalSessions = allSessions.length;
     const totalMessages = allMessages.filter((m) => m.isUser).length;
     const userIds = new Set(allMessages.filter((m) => m.isUser).map((m) => m.sessionId));
     const totalUsers = userIds.size;
-    res.json({ totalMessages, totalSessions, totalUsers });
+    const totalViews = schoolViews[schoolCode] || 0;
+    const totalActiveViewers = schoolActiveViewers[schoolCode]?.size || 0;
+    res.json({ totalMessages, totalSessions, totalUsers, totalViews, totalActiveViewers });
   });
   app2.get("/api/school/:schoolCode/recent-activity", async (req, res) => {
     const { schoolCode } = req.params;
     const allMessages = storage.getAllChatMessages();
     const recent = allMessages.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
     res.json({ recent });
+  });
+  app2.get("/api/school/:schoolCode/sessions", async (req, res) => {
+    const { schoolCode } = req.params;
+    const { startDate, endDate } = req.query;
+    let start = void 0;
+    let end = void 0;
+    if (typeof startDate === "string") start = new Date(startDate);
+    if (typeof endDate === "string") end = new Date(endDate);
+    const sessions = await getAllSessionsBySchool(schoolCode);
+    const sessionsWithCounts = await Promise.all(sessions.map(async (session) => {
+      const totalMessages = await countMessagesBySession(session.sessionId, schoolCode);
+      return { ...session, totalMessages };
+    }));
+    res.json({ sessions: sessionsWithCounts });
+  });
+  app2.get("/api/school/:schoolCode/session/:sessionId/messages", async (req, res) => {
+    const { schoolCode, sessionId } = req.params;
+    const messages = await getMessagesBySession(sessionId, schoolCode);
+    res.json({ messages });
+  });
+  app2.get("/:schoolCode/inject.js", (req, res) => {
+    const { schoolCode } = req.params;
+    res.type("application/javascript").send(`
+      (function() {
+        var containerId = 'widget-root';
+        if (!document.getElementById(containerId)) {
+          var div = document.createElement('div');
+          div.id = containerId;
+          document.body.appendChild(div);
+        }
+        var script = document.createElement('script');
+        script.src = '/static/chat-widget.js';
+        script.onload = function() {
+          window.initSchoolChatWidget && window.initSchoolChatWidget({ schoolCode: '${schoolCode}' });
+        };
+        document.body.appendChild(script);
+      })();
+    `);
   });
   const httpServer = createServer(app2);
   return httpServer;
@@ -269,13 +423,15 @@ var vite_config_default = defineConfig({
   },
   root: path.resolve(__dirname, "client"),
   build: {
-    outDir: path.resolve(__dirname, "dist"),
-    emptyOutDir: true,
-    rollupOptions: {
-      input: {
-        widget: path.resolve(__dirname, "client/widget.html")
-      }
-    }
+    outDir: path.resolve(__dirname, "../dist"),
+    emptyOutDir: false,
+    lib: {
+      entry: path.resolve(__dirname, "client/src/widget.tsx"),
+      name: "SchoolChatWidget",
+      fileName: () => "chat-widget.js",
+      formats: ["iife"]
+    },
+    minify: true
   },
   server: {
     fs: {
@@ -353,13 +509,18 @@ function serveStatic(app2) {
 }
 
 // server/index.ts
+import path3 from "path";
+import { fileURLToPath as fileURLToPath2 } from "url";
+var __filename2 = fileURLToPath2(import.meta.url);
+var __dirname2 = path3.dirname(__filename2);
 var app = express2();
 app.use(express2.json());
 app.use(express2.urlencoded({ extended: false }));
 app.use(express2.static("dist"));
+app.use("/static", express2.static(path3.join(__dirname2, "../dist")));
 app.use((req, res, next) => {
   const start = Date.now();
-  const path3 = req.path;
+  const path4 = req.path;
   let capturedJsonResponse = void 0;
   const originalResJson = res.json;
   res.json = function(bodyJson, ...args) {
@@ -368,8 +529,8 @@ app.use((req, res, next) => {
   };
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path3.startsWith("/api")) {
-      let logLine = `${req.method} ${path3} ${res.statusCode} in ${duration}ms`;
+    if (path4.startsWith("/api")) {
+      let logLine = `${req.method} ${path4} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }

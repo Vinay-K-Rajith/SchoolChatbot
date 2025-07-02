@@ -17,13 +17,15 @@ export default defineConfig({
   },
   root: path.resolve(__dirname, "client"),
   build: {
-    outDir: path.resolve(__dirname, "dist"),
-    emptyOutDir: true,
-    rollupOptions: {
-      input: {
-        widget: path.resolve(__dirname, 'client/widget.html'),
-      }
+    outDir: path.resolve(__dirname, "../dist"),
+    emptyOutDir: false,
+    lib: {
+      entry: path.resolve(__dirname, 'client/src/widget.tsx'),
+      name: 'SchoolChatWidget',
+      fileName: () => 'chat-widget.js',
+      formats: ['iife'],
     },
+    minify: true,
   },
   server: {
     fs: {

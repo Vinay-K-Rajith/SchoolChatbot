@@ -9,6 +9,8 @@ export interface IStorage {
   getChatMessages(sessionId: string): Promise<ChatMessage[]>;
   getAllChatSessions(): ChatSession[];
   getAllChatMessages(): ChatMessage[];
+  getAllChatSessionsBySchool(schoolCode: string): ChatSession[];
+  getAllChatMessagesBySchool(schoolCode: string): ChatMessage[];
 }
 
 export class MemStorage implements IStorage {
@@ -47,6 +49,7 @@ export class MemStorage implements IStorage {
     const session: ChatSession = {
       id: Date.now(),
       sessionId: insertSession.sessionId,
+      schoolCode: insertSession.schoolCode,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -56,19 +59,20 @@ export class MemStorage implements IStorage {
   }
 
   async createChatMessage(insertMessage: InsertChatMessage): Promise<ChatMessage> {
+    const session = this.chatSessions.get(insertMessage.sessionId);
+    const schoolCode = insertMessage.schoolCode || (session ? session.schoolCode : "");
     const message: ChatMessage = {
       id: this.currentMessageId++,
       sessionId: insertMessage.sessionId,
+      schoolCode,
       content: insertMessage.content,
       isUser: insertMessage.isUser,
       timestamp: new Date(),
       metadata: insertMessage.metadata || null,
     };
-
     const sessionMessages = this.chatMessages.get(insertMessage.sessionId) || [];
     sessionMessages.push(message);
     this.chatMessages.set(insertMessage.sessionId, sessionMessages);
-
     return message;
   }
 
@@ -82,6 +86,14 @@ export class MemStorage implements IStorage {
 
   getAllChatMessages(): ChatMessage[] {
     return Array.from(this.chatMessages.values()).flat();
+  }
+
+  getAllChatSessionsBySchool(schoolCode: string): ChatSession[] {
+    return Array.from(this.chatSessions.values()).filter(s => s.schoolCode === schoolCode);
+  }
+
+  getAllChatMessagesBySchool(schoolCode: string): ChatMessage[] {
+    return Array.from(this.chatMessages.values()).flat().filter(m => m.schoolCode === schoolCode);
   }
 }
 

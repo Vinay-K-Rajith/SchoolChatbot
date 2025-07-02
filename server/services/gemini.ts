@@ -31,3 +31,35 @@ export async function generateResponse(userMessage: string, sessionId?: string, 
     return "Sorry, there was an error generating a response.";
   }
 }
+
+export async function updateKnowledgeBaseWithGemini(currentKnowledgeBase: any, newInput: { text: string; image?: string | null }): Promise<any> {
+  try {
+    const systemPrompt = `You are an expert school admin assistant. Here is the current knowledge base for the school as JSON:\n${JSON.stringify(currentKnowledgeBase, null, 2)}\n\nHere is new information to add or update (text and optional image URL):\n${JSON.stringify(newInput, null, 2)}\n\nReturn the updated knowledge base as a JSON object. Only return valid JSON, no explanations.`;
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite-preview-06-17" });
+    const chat = model.startChat({
+      history: [
+        {
+          role: "user",
+          parts: [{ text: systemPrompt }],
+        },
+      ],
+      generationConfig: {
+        maxOutputTokens: 2048,
+      },
+    });
+    const result = await chat.sendMessage("Update the knowledge base.");
+    // Try to parse the response as JSON
+    const text = result.response.text();
+    const jsonStart = text.indexOf('{');
+    const jsonEnd = text.lastIndexOf('}');
+    if (jsonStart !== -1 && jsonEnd !== -1) {
+      const jsonString = text.substring(jsonStart, jsonEnd + 1);
+      return JSON.parse(jsonString);
+    }
+    throw new Error("No valid JSON in Gemini response");
+  } catch (err) {
+    console.error("Gemini knowledge base update error:", err);
+    throw err;
+  }
+}

@@ -2,16 +2,37 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertChatMessageSchema, insertChatSessionSchema } from "@shared/schema";
-import { generateResponse } from "./services/gemini";
+import { generateResponse, updateKnowledgeBaseWithGemini } from "./services/gemini";
 import { nanoid } from "nanoid";
-import { getSchoolData } from "./services/school-context";
+import { getSchoolData, getAllSessionsBySchool, getMessagesBySession, storeSession, storeMessage, countMessagesBySession } from "./services/school-context";
+import { MongoClient } from "mongodb";
+// @ts-ignore
+import requestIp from "request-ip";
+
+// In-memory view tracking per school
+const schoolViews: Record<string, number> = {};
+const schoolActiveViewers: Record<string, Set<string>> = {};
+
+// Middleware to track views and active viewers
+function trackView(schoolCode: string, viewerId: string) {
+  schoolViews[schoolCode] = (schoolViews[schoolCode] || 0) + 1;
+  if (!schoolActiveViewers[schoolCode]) schoolActiveViewers[schoolCode] = new Set();
+  schoolActiveViewers[schoolCode].add(viewerId);
+  // Remove viewers after 10 minutes (simulate active viewers)
+  setTimeout(() => {
+    schoolActiveViewers[schoolCode]?.delete(viewerId);
+  }, 10 * 60 * 1000);
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create a new chat session
   app.post("/api/chat/session", async (req, res) => {
     try {
       const sessionId = nanoid();
-      const session = await storage.createChatSession({ sessionId });
+      const schoolCode = req.body.schoolCode || "SXSBT";
+      const ip = requestIp.getClientIp(req) || req.ip || null;
+      const session = await storage.createChatSession({ sessionId, schoolCode });
+      await storeSession({ sessionId, schoolCode, createdAt: new Date(), updatedAt: new Date(), ip });
       res.json({ sessionId: session.sessionId });
     } catch (error) {
       console.error("Error creating chat session:", error);
@@ -31,9 +52,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Save user message
       const userMessage = await storage.createChatMessage({
         sessionId,
+        schoolCode,
         content,
         isUser: true,
       });
+      await storeMessage({ sessionId, schoolCode, content, isUser: true, timestamp: new Date() });
 
       // Generate AI response
       const aiResponse = await generateResponse(content, sessionId, schoolCode);
@@ -41,9 +64,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Save AI response
       const aiMessage = await storage.createChatMessage({
         sessionId,
+        schoolCode,
         content: aiResponse,
         isUser: false,
       });
+      await storeMessage({ sessionId, schoolCode, content: aiResponse, isUser: false, timestamp: new Date() });
 
       res.json({
         userMessage,
@@ -111,9 +136,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/school/:schoolCode/analytics", async (req, res) => {
     const { schoolCode } = req.params;
     const { timeframe = "hourly" } = req.query;
-    // TODO: Fetch analytics from MongoDB for the given schoolCode and timeframe
-    // Example: aggregate chat messages by hour/day/week/month/year
-    // Return mock data for now
+    // Only use messages for this school
+    const allMessages = storage.getAllChatMessagesBySchool(schoolCode);
+    // TODO: Aggregate by timeframe
+    // For now, return mock data
     const now = new Date();
     let data: { label: string; value: number }[] = [];
     if (timeframe === "hourly") {
@@ -134,25 +160,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/school/:schoolCode/knowledge-base", async (req, res) => {
     const { schoolCode } = req.params;
     const { text, image } = req.body;
-    // TODO: Use Gemini API to generate a MongoDB query based on text/image and update the school's knowledge base
-    // Use the provided Gemini API key and model
-    // For now, simulate success
-    res.json({ success: true, message: `Knowledge base updated for ${schoolCode}` });
+    try {
+      // 1. Fetch current school data
+      const school = await getSchoolData(schoolCode);
+      const currentKnowledgeBase = school?.knowledgeBase || {};
+      // 2. Call Gemini to get updated knowledge base
+      const updatedKnowledgeBase = await updateKnowledgeBaseWithGemini(currentKnowledgeBase, { text, image });
+      // 3. Update the knowledgeBase field in the DB
+      const uri = "mongodb+srv://vaishakhp11:PiPa7LUEZ5ufQo8z@cluster0.toscmfj.mongodb.net/";
+      const client = new MongoClient(uri);
+      await client.connect();
+      const db = client.db("test");
+      const collection = db.collection("school_data");
+      await collection.updateOne(
+        { schoolCode },
+        { $set: { knowledgeBase: updatedKnowledgeBase } }
+      );
+      // 4. Return success
+      res.json({ success: true, message: `Knowledge base updated for ${schoolCode}`, knowledgeBase: updatedKnowledgeBase });
+    } catch (err) {
+      console.error("Knowledge base update error:", err);
+      res.status(500).json({ error: "Failed to update knowledge base" });
+    }
   });
 
   // Metrics endpoint for dashboard
   app.get("/api/school/:schoolCode/metrics", async (req, res) => {
     const { schoolCode } = req.params;
-    // Aggregate metrics from storage
-    // For now, aggregate all sessions/messages (since schoolCode is not in schema, assume all data is for the school)
-    // In a real app, filter by schoolCode
-    const allSessions = storage.getAllChatSessions();
-    const allMessages = storage.getAllChatMessages();
+    // Track view and active viewer
+    const viewerId = req.ip + (req.headers['user-agent'] || '');
+    trackView(schoolCode, viewerId);
+    // Aggregate metrics for this school only
+    const allSessions = storage.getAllChatSessionsBySchool(schoolCode);
+    const allMessages = storage.getAllChatMessagesBySchool(schoolCode);
     const totalSessions = allSessions.length;
     const totalMessages = allMessages.filter(m => m.isUser).length;
     const userIds = new Set(allMessages.filter(m => m.isUser).map(m => m.sessionId));
     const totalUsers = userIds.size;
-    res.json({ totalMessages, totalSessions, totalUsers });
+    const totalViews = schoolViews[schoolCode] || 0;
+    const totalActiveViewers = (schoolActiveViewers[schoolCode]?.size) || 0;
+    res.json({ totalMessages, totalSessions, totalUsers, totalViews, totalActiveViewers });
   });
 
   // Recent activity endpoint for dashboard
@@ -162,6 +209,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const allMessages = storage.getAllChatMessages();
     const recent = allMessages.sort((a, b) => (b.timestamp as any) - (a.timestamp as any)).slice(0, 10);
     res.json({ recent });
+  });
+
+  // School-specific chat history endpoints
+  app.get("/api/school/:schoolCode/sessions", async (req, res) => {
+    const { schoolCode } = req.params;
+    const { startDate, endDate } = req.query;
+    let start: Date | undefined = undefined;
+    let end: Date | undefined = undefined;
+    if (typeof startDate === 'string') start = new Date(startDate);
+    if (typeof endDate === 'string') end = new Date(endDate);
+    const sessions = await getAllSessionsBySchool(schoolCode);
+    // For each session, count messages
+    const sessionsWithCounts = await Promise.all(sessions.map(async (session: any) => {
+      const totalMessages = await countMessagesBySession(session.sessionId, schoolCode);
+      return { ...session, totalMessages };
+    }));
+    res.json({ sessions: sessionsWithCounts });
+  });
+
+  app.get("/api/school/:schoolCode/session/:sessionId/messages", async (req, res) => {
+    const { schoolCode, sessionId } = req.params;
+    const messages = await getMessagesBySession(sessionId, schoolCode);
+    res.json({ messages });
+  });
+
+  // Serve dynamic inject.js for embeddable widget
+  app.get('/:schoolCode/inject.js', (req, res) => {
+    const { schoolCode } = req.params;
+    res.type('application/javascript').send(`
+      (function() {
+        var containerId = 'widget-root';
+        if (!document.getElementById(containerId)) {
+          var div = document.createElement('div');
+          div.id = containerId;
+          document.body.appendChild(div);
+        }
+        var script = document.createElement('script');
+        script.src = '/static/chat-widget.js';
+        script.onload = function() {
+          window.initSchoolChatWidget && window.initSchoolChatWidget({ schoolCode: '${schoolCode}' });
+        };
+        document.body.appendChild(script);
+      })();
+    `);
   });
 
   const httpServer = createServer(app);

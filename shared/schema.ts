@@ -11,6 +11,7 @@ export const users = pgTable("users", {
 export const chatSessions = pgTable("chat_sessions", {
   id: serial("id").primaryKey(),
   sessionId: text("session_id").notNull().unique(),
+  schoolCode: text("school_code").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -18,6 +19,7 @@ export const chatSessions = pgTable("chat_sessions", {
 export const chatMessages = pgTable("chat_messages", {
   id: serial("id").primaryKey(),
   sessionId: text("session_id").notNull(),
+  schoolCode: text("school_code").notNull(),
   content: text("content").notNull(),
   isUser: boolean("is_user").notNull(),
   timestamp: timestamp("timestamp").defaultNow(),
@@ -31,10 +33,12 @@ export const insertUserSchema = createInsertSchema(users).pick({
 
 export const insertChatSessionSchema = createInsertSchema(chatSessions).pick({
   sessionId: true,
+  schoolCode: true,
 });
 
 export const insertChatMessageSchema = createInsertSchema(chatMessages).pick({
   sessionId: true,
+  schoolCode: true,
   content: true,
   isUser: true,
   metadata: true,

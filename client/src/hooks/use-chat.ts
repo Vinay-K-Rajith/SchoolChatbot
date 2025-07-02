@@ -9,16 +9,16 @@ interface ChatResponse {
   aiMessage: ChatMessage;
 }
 
-export function useChat() {
+export function useChat(schoolCodeProp?: string) {
   const [sessionId, setSessionId] = useState<string>("");
   const queryClient = useQueryClient();
-  const schoolCode = "SXSBT"; // TODO: Make dynamic if needed
+  const schoolCode = schoolCodeProp || "SXSBT"; // Use prop if provided
 
   // Create session on mount
   useEffect(() => {
     const initSession = async () => {
       try {
-        const response = await apiRequest("POST", "/api/chat/session");
+        const response = await apiRequest("POST", "/api/chat/session", { schoolCode });
         const data = await response.json();
         setSessionId(data.sessionId);
       } catch (error) {
@@ -29,7 +29,7 @@ export function useChat() {
     };
 
     initSession();
-  }, []);
+  }, [schoolCode]);
 
   // Get chat history
   const { data: historyData } = useQuery({

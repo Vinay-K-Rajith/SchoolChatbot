@@ -20,7 +20,7 @@ export default function Home() {
     <div className="font-inter bg-gray-50 min-h-screen flex items-center justify-center">
       <div className="w-full max-w-2xl">
         <div className="flex justify-end mb-2">
-          <a href={`/${schoolCode}/dashboard`} className="text-school-blue underline font-medium">Go to Dashboard</a>
+          <a href={`/${schoolCode}/dashboard`} className="text-school-blue underline font-medium"></a>
         </div>
         <ChatInterface isOpen={true} onClose={() => {}} schoolCode={schoolCode} />
       </div>
