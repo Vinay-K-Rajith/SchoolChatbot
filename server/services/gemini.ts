@@ -1,9 +1,9 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getSchoolData } from "./school-context";
+import dotenv from "dotenv";
+dotenv.config();
 
-const genAI = new GoogleGenerativeAI(
-  process.env.GOOGLE_API_KEY || "AIzaSyD2u1YsYP5eWNhzREAHc3hsnLtvD0ImVKI"
-);
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
 
 export async function generateResponse(userMessage: string, sessionId?: string, schoolCode: string = "SXSBT"): Promise<string> {
   try {

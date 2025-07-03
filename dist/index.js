@@ -91,7 +91,9 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // server/services/school-context.ts
 import { MongoClient } from "mongodb";
-var uri = "mongodb+srv://vaishakhp11:PiPa7LUEZ5ufQo8z@cluster0.toscmfj.mongodb.net/";
+import dotenv from "dotenv";
+dotenv.config();
+var uri = process.env.MONGODB_URI || "";
 var client = new MongoClient(uri);
 async function getSchoolData(schoolCode) {
   await client.connect();
@@ -132,9 +134,9 @@ async function countMessagesBySession(sessionId, schoolCode) {
 }
 
 // server/services/gemini.ts
-var genAI = new GoogleGenerativeAI(
-  process.env.GOOGLE_API_KEY || "AIzaSyD2u1YsYP5eWNhzREAHc3hsnLtvD0ImVKI"
-);
+import dotenv2 from "dotenv";
+dotenv2.config();
+var genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
 async function generateResponse(userMessage, sessionId, schoolCode = "SXSBT") {
   try {
     const schoolContext = await getSchoolData(schoolCode);
@@ -204,6 +206,8 @@ Return the updated knowledge base as a JSON object. Only return valid JSON, no e
 import { nanoid } from "nanoid";
 import { MongoClient as MongoClient2 } from "mongodb";
 import requestIp from "request-ip";
+import dotenv3 from "dotenv";
+dotenv3.config();
 var schoolViews = {};
 var schoolActiveViewers = {};
 function trackView(schoolCode, viewerId) {
@@ -329,7 +333,7 @@ async function registerRoutes(app2) {
       const school = await getSchoolData(schoolCode);
       const currentKnowledgeBase = school?.knowledgeBase || {};
       const updatedKnowledgeBase = await updateKnowledgeBaseWithGemini(currentKnowledgeBase, { text, image });
-      const uri2 = "mongodb+srv://vaishakhp11:PiPa7LUEZ5ufQo8z@cluster0.toscmfj.mongodb.net/";
+      const uri2 = process.env.MONGODB_URI || "";
       const client2 = new MongoClient2(uri2);
       await client2.connect();
       const db = client2.db("test");
@@ -371,7 +375,19 @@ async function registerRoutes(app2) {
     let end = void 0;
     if (typeof startDate === "string") start = new Date(startDate);
     if (typeof endDate === "string") end = new Date(endDate);
-    const sessions = await getAllSessionsBySchool(schoolCode);
+    let sessions = await getAllSessionsBySchool(schoolCode);
+    if (typeof start === "string") start = new Date(start);
+    if (typeof end === "string") end = new Date(end);
+    if (start && end) {
+      const startTime = start.getTime();
+      const endTime = end.getTime();
+      sessions = sessions.filter((session) => {
+        const created = session.createdAt ? new Date(session.createdAt) : null;
+        if (!created || isNaN(created.getTime())) return false;
+        const createdTime = created.getTime();
+        return createdTime >= startTime && createdTime <= endTime;
+      });
+    }
     const sessionsWithCounts = await Promise.all(sessions.map(async (session) => {
       const totalMessages = await countMessagesBySession(session.sessionId, schoolCode);
       return { ...session, totalMessages };

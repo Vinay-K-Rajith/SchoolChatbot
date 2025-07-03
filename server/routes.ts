@@ -8,6 +8,9 @@ import { getSchoolData, getAllSessionsBySchool, getMessagesBySession, storeSessi
 import { MongoClient } from "mongodb";
 // @ts-ignore
 import requestIp from "request-ip";
+// If you get a 'Cannot find module \"dotenv\"' error, run: npm install dotenv
+import dotenv from "dotenv";
+dotenv.config();
 
 // In-memory view tracking per school
 const schoolViews: Record<string, number> = {};
@@ -167,7 +170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 2. Call Gemini to get updated knowledge base
       const updatedKnowledgeBase = await updateKnowledgeBaseWithGemini(currentKnowledgeBase, { text, image });
       // 3. Update the knowledgeBase field in the DB
-      const uri = "mongodb+srv://vaishakhp11:PiPa7LUEZ5ufQo8z@cluster0.toscmfj.mongodb.net/";
+      const uri = process.env.MONGODB_URI || "";
       const client = new MongoClient(uri);
       await client.connect();
       const db = client.db("test");
@@ -220,10 +223,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (typeof startDate === 'string') start = new Date(startDate);
     if (typeof endDate === 'string') end = new Date(endDate);
     let sessions = await getAllSessionsBySchool(schoolCode);
+    // Ensure start and end are Date objects
+    if (typeof start === 'string') start = new Date(start);
+    if (typeof end === 'string') end = new Date(end);
     if (start && end) {
+      const startTime = start.getTime();
+      const endTime = end.getTime();
       sessions = sessions.filter((session: any) => {
-        const created = new Date(session.createdAt);
-        return created >= start && created <= end;
+        // Robustly parse createdAt (handle ISO string or Date object)
+        const created = session.createdAt ? new Date(session.createdAt) : null;
+        if (!created || isNaN(created.getTime())) return false;
+        const createdTime = created.getTime();
+        return createdTime >= startTime && createdTime <= endTime;
       });
     }
     // For each session, count messages
