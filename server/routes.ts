@@ -219,7 +219,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     let end: Date | undefined = undefined;
     if (typeof startDate === 'string') start = new Date(startDate);
     if (typeof endDate === 'string') end = new Date(endDate);
-    const sessions = await getAllSessionsBySchool(schoolCode);
+    let sessions = await getAllSessionsBySchool(schoolCode);
+    if (start && end) {
+      sessions = sessions.filter((session: any) => {
+        const created = new Date(session.createdAt);
+        return created >= start && created <= end;
+      });
+    }
     // For each session, count messages
     const sessionsWithCounts = await Promise.all(sessions.map(async (session: any) => {
       const totalMessages = await countMessagesBySession(session.sessionId, schoolCode);
@@ -246,13 +252,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
           document.body.appendChild(div);
         }
         var script = document.createElement('script');
-        script.src = '/static/chat-widget.js';
+        script.src = 'http://127.0.0.1:5173/static/chat-widget.js';
         script.onload = function() {
           window.initSchoolChatWidget && window.initSchoolChatWidget({ schoolCode: '${schoolCode}' });
         };
         document.body.appendChild(script);
       })();
     `);
+  });
+
+  // Get formatted knowledge base for display
+  app.get("/api/school/:schoolCode/knowledge-base-formatted", async (req, res) => {
+    const { schoolCode } = req.params;
+    try {
+      const school = await getSchoolData(schoolCode);
+      if (!school || Object.keys(school).length === 0) {
+        return res.json({ formatted: "<span style='color:#888'>No knowledge base found for this school.</span>" });
+      }
+      // Use Gemini to format the full school context for display
+      const { GoogleGenerativeAI } = require("@google/generative-ai");
+      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "AIzaSyD2u1YsYP5eWNhzREAHc3hsnLtvD0ImVKI");
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite-preview-06-17" });
+      const prompt = `Format the following school context as a knowledge base for display to users. Use clear sections, bullet points, and emojis where appropriate. Do not use tables.\n\nSchool Context:\n${JSON.stringify(school, null, 2)}`;
+      const chat = model.startChat({
+        history: [
+          { role: "user", parts: [{ text: prompt }] },
+        ],
+        generationConfig: { maxOutputTokens: 2048 },
+      });
+      const result = await chat.sendMessage("Format the knowledge base for display.");
+      const formatted = result.response.text();
+      res.json({ formatted });
+    } catch (err) {
+      console.error("Error formatting knowledge base:", err);
+      res.status(500).json({ error: "Failed to format knowledge base" });
+    }
   });
 
   const httpServer = createServer(app);

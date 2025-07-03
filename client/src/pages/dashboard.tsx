@@ -119,6 +119,8 @@ export default function Dashboard() {
   const [chatDialogOpen, setChatDialogOpen] = useState(false);
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
   const [currentKb, setCurrentKb] = useState<any>(null);
+  const [formattedKb, setFormattedKb] = useState<string>("");
+  const [formattedKbLoading, setFormattedKbLoading] = useState(false);
 
   useEffect(() => {
     fetch(`/api/school/${schoolCode}`)
@@ -134,6 +136,14 @@ export default function Dashboard() {
         url += `?startDate=${encodeURIComponent(dateRange.start)}&endDate=${encodeURIComponent(dateRange.end)}`;
       }
       fetch(url).then(r => r.json()).then(d => setChatSessions(d.sessions || []));
+    }
+    if (tab === 'kb') {
+      setFormattedKbLoading(true);
+      fetch(`/api/school/${schoolCode}/knowledge-base-formatted`)
+        .then(r => r.json())
+        .then(data => setFormattedKb(data.formatted || ""))
+        .catch(() => setFormattedKb("Failed to load formatted knowledge base."))
+        .finally(() => setFormattedKbLoading(false));
     }
   }, [schoolCode, tab, dateRange]);
 
@@ -239,67 +249,73 @@ export default function Dashboard() {
         )}
         {/* Knowledge Base Editor */}
         {tab === "kb" && (
-          <Card sx={{ maxWidth: 900, mx: 'auto', mt: 4, p: 2, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
-            {/* Current Knowledge Base */}
-            <Box sx={{ flex: 1, minWidth: 0, borderRight: { md: '1px solid #e0e7ef' }, pr: { md: 3 }, mb: { xs: 3, md: 0 } }}>
-              <Typography variant="h6" fontWeight={700} mb={1}>Current Knowledge Base</Typography>
-              {currentKb ? (
-                <Box sx={{ bgcolor: '#f3f8fd', borderRadius: 2, p: 2, fontSize: 15, maxHeight: 350, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
-                  <pre style={{ margin: 0, fontFamily: 'inherit' }}>{JSON.stringify(currentKb, null, 2)}</pre>
-                </Box>
-              ) : (
-                <Typography color="text.secondary">No knowledge base found for this school.</Typography>
-              )}
-            </Box>
-            {/* Update Form */}
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography variant="h6" fontWeight={700} mb={1}>Update Knowledge Base</Typography>
-              <form className="space-y-4" onSubmit={handleKbSubmit}>
-                <TextField
-                  label="Text Input"
-                  multiline
-                  minRows={4}
-                  fullWidth
-                  value={kbInput}
-                  onChange={e => setKbInput(e.target.value)}
-                  placeholder="Enter knowledge base text..."
-                  variant="outlined"
-                  sx={{ mb: 2 }}
-                />
-                <Box sx={{ mb: 2 }}>
-                  <Typography fontWeight={500} mb={0.5}>Upload Image</Typography>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    style={{ display: 'block', marginBottom: 8 }}
-                    onChange={e => setKbImage(e.target.files?.[0] || null)}
-                  />
-                  {kbImage && (
-                    <Box sx={{ position: 'relative', display: 'inline-block', mb: 1 }}>
-                      <img
-                        src={URL.createObjectURL(kbImage)}
-                        alt="Preview"
-                        style={{ maxWidth: 120, maxHeight: 120, borderRadius: 8, border: '1px solid #e0e7ef' }}
-                      />
-                      <Button size="small" color="error" sx={{ position: 'absolute', top: 0, right: 0, minWidth: 0, p: 0.5 }} onClick={() => setKbImage(null)}>Remove</Button>
-                    </Box>
-                  )}
-                </Box>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  color="primary"
-                  disabled={loading || !kbInput.trim()}
-                  sx={{ minWidth: 180, fontWeight: 600 }}
-                >
-                  {loading ? <CircularProgress size={22} color="inherit" /> : "Update Knowledge Base"}
-                </Button>
-                {kbResult && (
-                  <Alert severity={kbResult.toLowerCase().includes('fail') ? 'error' : 'success'} sx={{ mt: 2 }}>{kbResult}</Alert>
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', minHeight: '60vh', bgcolor: '#eaf1fb', py: 6 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'row', bgcolor: 'white', borderRadius: 3, boxShadow: 1, maxWidth: 1200, width: '100%', mx: 2, p: 4, gap: 4 }}>
+              {/* Current Knowledge Base */}
+              <Box sx={{ flex: 1, minWidth: 0, borderRight: { md: '1px solid #e0e7ef' }, pr: { md: 4 }, mb: { xs: 3, md: 0 } }}>
+                <Typography variant="h5" fontWeight={700} mb={2}>Current Knowledge Base</Typography>
+                {formattedKbLoading ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 120 }}>
+                    <CircularProgress />
+                  </Box>
+                ) : formattedKb ? (
+                  <Box sx={{ bgcolor: '#f3f8fd', borderRadius: 2, p: 2, fontSize: 16, minHeight: 180, maxHeight: 350, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
+                    <div dangerouslySetInnerHTML={{ __html: formattedKb.replace(/\n/g, '<br/>') }} />
+                  </Box>
+                ) : (
+                  <Typography color="text.secondary">No knowledge base found for this school.</Typography>
                 )}
-              </form>
+              </Box>
+              {/* Update Form */}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="h5" fontWeight={700} mb={2}>Update Knowledge Base</Typography>
+                <form className="space-y-4" onSubmit={handleKbSubmit}>
+                  <TextField
+                    label="Text Input"
+                    multiline
+                    minRows={4}
+                    fullWidth
+                    value={kbInput}
+                    onChange={e => setKbInput(e.target.value)}
+                    placeholder="Enter knowledge base text..."
+                    variant="outlined"
+                    sx={{ mb: 2 }}
+                  />
+                  <Box sx={{ mb: 2 }}>
+                    <Typography fontWeight={500} mb={0.5}>Upload Image</Typography>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'block', marginBottom: 8 }}
+                      onChange={e => setKbImage(e.target.files?.[0] || null)}
+                    />
+                    {kbImage && (
+                      <Box sx={{ position: 'relative', display: 'inline-block', mb: 1 }}>
+                        <img
+                          src={URL.createObjectURL(kbImage)}
+                          alt="Preview"
+                          style={{ maxWidth: 120, maxHeight: 120, borderRadius: 8, border: '1px solid #e0e7ef' }}
+                        />
+                        <Button size="small" color="error" sx={{ position: 'absolute', top: 0, right: 0, minWidth: 0, p: 0.5 }} onClick={() => setKbImage(null)}>Remove</Button>
+                      </Box>
+                    )}
+                  </Box>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    color="primary"
+                    disabled={loading || !kbInput.trim()}
+                    sx={{ minWidth: 180, fontWeight: 600 }}
+                  >
+                    {loading ? <CircularProgress size={22} color="inherit" /> : "Update Knowledge Base"}
+                  </Button>
+                  {kbResult && (
+                    <Alert severity={kbResult.toLowerCase().includes('fail') ? 'error' : 'success'} sx={{ mt: 2 }}>{kbResult}</Alert>
+                  )}
+                </form>
+              </Box>
             </Box>
-          </Card>
+          </Box>
         )}
         {/* Chat History Tab */}
         {tab === "chat" && (

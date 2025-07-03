@@ -1,3 +1,10 @@
+var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
+  get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
+}) : x)(function(x) {
+  if (typeof require !== "undefined") return require.apply(this, arguments);
+  throw Error('Dynamic require of "' + x + '" is not supported');
+});
+
 // server/index.ts
 import express2 from "express";
 
@@ -387,13 +394,41 @@ async function registerRoutes(app2) {
           document.body.appendChild(div);
         }
         var script = document.createElement('script');
-        script.src = '/static/chat-widget.js';
+        script.src = 'http://127.0.0.1:5173/static/chat-widget.js';
         script.onload = function() {
           window.initSchoolChatWidget && window.initSchoolChatWidget({ schoolCode: '${schoolCode}' });
         };
         document.body.appendChild(script);
       })();
     `);
+  });
+  app2.get("/api/school/:schoolCode/knowledge-base-formatted", async (req, res) => {
+    const { schoolCode } = req.params;
+    try {
+      const school = await getSchoolData(schoolCode);
+      if (!school || Object.keys(school).length === 0) {
+        return res.json({ formatted: "<span style='color:#888'>No knowledge base found for this school.</span>" });
+      }
+      const { GoogleGenerativeAI: GoogleGenerativeAI2 } = __require("@google/generative-ai");
+      const genAI2 = new GoogleGenerativeAI2(process.env.GOOGLE_API_KEY || "AIzaSyD2u1YsYP5eWNhzREAHc3hsnLtvD0ImVKI");
+      const model = genAI2.getGenerativeModel({ model: "gemini-2.5-flash-lite-preview-06-17" });
+      const prompt = `Format the following school context as a knowledge base for display to users. Use clear sections, bullet points, and emojis where appropriate. Do not use tables.
+
+School Context:
+${JSON.stringify(school, null, 2)}`;
+      const chat = model.startChat({
+        history: [
+          { role: "user", parts: [{ text: prompt }] }
+        ],
+        generationConfig: { maxOutputTokens: 2048 }
+      });
+      const result = await chat.sendMessage("Format the knowledge base for display.");
+      const formatted = result.response.text();
+      res.json({ formatted });
+    } catch (err) {
+      console.error("Error formatting knowledge base:", err);
+      res.status(500).json({ error: "Failed to format knowledge base" });
+    }
   });
   const httpServer = createServer(app2);
   return httpServer;
@@ -410,10 +445,12 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { fileURLToPath } from "url";
+import vitePluginCssInjectedByJs from "vite-plugin-css-injected-by-js";
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
 var vite_config_default = defineConfig({
-  plugins: [react()],
+  root: path.resolve(__dirname, "client"),
+  plugins: [react(), vitePluginCssInjectedByJs()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "client", "src"),
@@ -421,9 +458,8 @@ var vite_config_default = defineConfig({
       "@assets": path.resolve(__dirname, "attached_assets")
     }
   },
-  root: path.resolve(__dirname, "client"),
   build: {
-    outDir: path.resolve(__dirname, "../dist"),
+    outDir: path.resolve(__dirname, "dist"),
     emptyOutDir: false,
     lib: {
       entry: path.resolve(__dirname, "client/src/widget.tsx"),
@@ -431,7 +467,17 @@ var vite_config_default = defineConfig({
       fileName: () => "chat-widget.js",
       formats: ["iife"]
     },
-    minify: true
+    minify: true,
+    rollupOptions: {
+      output: {
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name && assetInfo.name.endsWith(".css")) {
+            return "static/chat-widget.css";
+          }
+          return "static/[name][extname]";
+        }
+      }
+    }
   },
   server: {
     fs: {

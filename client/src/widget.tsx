@@ -1,3 +1,4 @@
+import './index.css';
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -6,7 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ChatInterface } from "./components/chatbot/chat-interface";
 
-function FloatingChatWidget({ schoolCode }: { schoolCode: string }) {
+function FloatingChatWidget({ schoolCode, shadowRoot }: { schoolCode: string; shadowRoot: ShadowRoot }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -78,23 +79,45 @@ function FloatingChatWidget({ schoolCode }: { schoolCode: string }) {
 
 declare global {
   interface Window {
-    initSchoolChatWidget: (opts: { schoolCode: string; containerId?: string }) => void;
+    initSchoolChatWidget: (opts: { schoolCode: string; containerId?: string; cssUrl?: string }) => void;
+  }
+}
+
+// Helper to inject CSS into shadow root
+function injectCSS(shadowRoot: ShadowRoot, cssUrl?: string) {
+  if (cssUrl) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = cssUrl;
+    shadowRoot.appendChild(link);
+  } else {
+    // Optionally, inline fallback CSS here
   }
 }
 
 // Export a global function for embeddable usage
-window.initSchoolChatWidget = function({ schoolCode, containerId = "widget-root" }: { schoolCode: string; containerId?: string }) {
-  const container = document.getElementById(containerId);
+window.initSchoolChatWidget = function({ schoolCode, containerId = "widget-root", cssUrl = "/static/chat-widget.css" }: { schoolCode: string; containerId?: string; cssUrl?: string }) {
+  let container = document.getElementById(containerId);
   if (!container) {
-    console.error(`SchoolChatAssistant: Container #${containerId} not found.`);
-    return;
+    container = document.createElement('div');
+    container.id = containerId;
+    document.body.appendChild(container);
   }
-  const root = createRoot(container);
-  root.render(
+  // Attach shadow root
+  let shadowRoot = (container.shadowRoot as ShadowRoot) || container.attachShadow({ mode: 'open' });
+  // Clean shadow root
+  while (shadowRoot.firstChild) shadowRoot.removeChild(shadowRoot.firstChild);
+  // Inject CSS
+  injectCSS(shadowRoot, cssUrl);
+  // Create a mount point for React
+  const reactRoot = document.createElement('div');
+  shadowRoot.appendChild(reactRoot);
+  // Render React app
+  createRoot(reactRoot).render(
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <FloatingChatWidget schoolCode={schoolCode} />
+        <FloatingChatWidget schoolCode={schoolCode} shadowRoot={shadowRoot} />
       </TooltipProvider>
     </QueryClientProvider>
   );
