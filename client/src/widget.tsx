@@ -42,7 +42,7 @@ function FloatingChatWidget({ schoolCode, shadowRoot }: { schoolCode: string; sh
             bottom: 100,
             right: 24,
             zIndex: 10000,
-            width: 400,
+            width: 370,
             maxWidth: '95vw',
             height: 600,
             background: 'white',

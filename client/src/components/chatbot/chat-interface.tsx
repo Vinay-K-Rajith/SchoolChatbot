@@ -88,7 +88,7 @@ export function ChatInterface({ isOpen, onClose, schoolCode }: ChatInterfaceProp
       onClick={onClose}
     >
       <div
-        className="w-full md:w-[736px] max-w-[98vw] h-[calc(98vh-58px)] md:h-[calc(48rem-58px)] bg-white rounded-3xl shadow-2xl border border-gray-200 flex flex-col animate-slide-up overflow-hidden m-2 md:m-6"
+        className="w-full md:w-[606px] max-w-[98vw] h-[calc(98vh-58px)] md:h-[calc(48rem-58px)] bg-white rounded-3xl shadow-2xl border border-gray-200 flex flex-col animate-slide-up overflow-hidden m-2 md:m-6"
         onClick={e => e.stopPropagation()}
       >
         {/* Quick Actions (top, no label) */}

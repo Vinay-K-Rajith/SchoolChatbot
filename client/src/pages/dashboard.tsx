@@ -193,10 +193,6 @@ export default function Dashboard() {
     setSessionMessages([]);
   };
 
-  // Calculate metrics from chatSessions if in chat tab
-  const totalSessionsFromTable = chatSessions.length;
-  const totalMessagesFromTable = chatSessions.reduce((sum, s) => sum + (typeof s.totalMessages === 'number' ? s.totalMessages : 0), 0);
-
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#eaf1fb', display: 'flex' }}>
       <Sidebar schoolName={schoolName} schoolCode={schoolCode} tab={tab} setTab={setTab} />
@@ -212,8 +208,8 @@ export default function Dashboard() {
         {/* Metrics Cards */}
         {tab === "dashboard" && (
           <Box sx={{ display: 'flex', flexDirection: 'row', gap: 2, mb: 3 }}>
-            <MetricsCard label="Total Messages" value={Math.floor(totalMessagesFromTable / 2)} icon={<span role="img" aria-label="messages">💬</span>} color="text-blue-500" />
-            <MetricsCard label="Total Sessions" value={totalSessionsFromTable} icon={<span role="img" aria-label="sessions">🗂️</span>} color="text-green-500" />
+            <MetricsCard label="Total Messages" value={metrics.totalMessages ?? "-"} icon={<span role="img" aria-label="messages">💬</span>} color="text-blue-500" />
+            <MetricsCard label="Total Sessions" value={metrics.totalSessions ?? "-"} icon={<span role="img" aria-label="sessions">🗂️</span>} color="text-green-500" />
             <MetricsCard label="Total Active Users" value={metrics.totalUsers ?? "-"} icon={<span role="img" aria-label="users">👤</span>} color="text-purple-500" />
           </Box>
         )}
