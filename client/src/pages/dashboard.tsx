@@ -103,7 +103,13 @@ function Sidebar({ schoolName, schoolCode, tab, setTab }: { schoolName: string; 
 
 export default function Dashboard() {
   const [location] = useLocation();
-  const schoolCode = location.split("/").filter(Boolean)[0];
+  // Extract schoolCode from path and token from query params
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get('token');
+  const schoolCode = urlParams.get('schoolCode') || location.split("/").filter(Boolean)[0];
+  const [authStatus, setAuthStatus] = useState<'pending' | 'success' | 'error'>(token ? 'pending' : 'error');
+  const [authError, setAuthError] = useState<string>("");
+
   const [schoolName, setSchoolName] = useState<string>("");
   const [tab, setTab] = useState("dashboard");
   const [timeframe, setTimeframe] = useState("Hourly");
@@ -122,7 +128,36 @@ export default function Dashboard() {
   const [formattedKb, setFormattedKb] = useState<string>("");
   const [formattedKbLoading, setFormattedKbLoading] = useState(false);
 
+  // Auth validation effect
   useEffect(() => {
+    if (!token || !schoolCode) {
+      setAuthStatus('error');
+      setAuthError('Missing token or school code in URL.');
+      return;
+    }
+    setAuthStatus('pending');
+    fetch('https://webapi.entab.info/api/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, schoolcode: schoolCode })
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          setAuthStatus('success');
+        } else {
+          setAuthStatus('error');
+          setAuthError('Invalid or expired token.');
+        }
+      })
+      .catch(() => {
+        setAuthStatus('error');
+        setAuthError('Failed to validate token.');
+      });
+  }, [token, schoolCode]);
+
+  useEffect(() => {
+    if (authStatus !== 'success') return;
     fetch(`/api/school/${schoolCode}`)
       .then(r => r.json())
       .then(data => {
@@ -145,7 +180,7 @@ export default function Dashboard() {
         .catch(() => setFormattedKb("Failed to load formatted knowledge base."))
         .finally(() => setFormattedKbLoading(false));
     }
-  }, [schoolCode, tab, dateRange]);
+  }, [schoolCode, tab, dateRange, authStatus]);
 
   useEffect(() => {
     fetch(`/api/school/${schoolCode}/analytics?timeframe=${timeframe.toLowerCase()}`)
@@ -193,6 +228,22 @@ export default function Dashboard() {
     setSessionMessages([]);
   };
 
+  if (authStatus === 'pending') {
+    return (
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <CircularProgress />
+        <span style={{ marginLeft: 16 }}>Validating access…</span>
+      </Box>
+    );
+  }
+  if (authStatus === 'error') {
+    return (
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Alert severity="error">{authError || 'Authentication failed. Please check your link.'}</Alert>
+      </Box>
+    );
+  }
+  // Auth success, show dashboard
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#eaf1fb', display: 'flex' }}>
       <Sidebar schoolName={schoolName} schoolCode={schoolCode} tab={tab} setTab={setTab} />

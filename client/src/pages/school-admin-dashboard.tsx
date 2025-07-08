@@ -801,8 +801,18 @@ export default function SchoolAdminDashboard() {
           </button>
           
           {newProjectResult && (
-            <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg">
-              {newProjectResult}
+            <div
+              className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg"
+              style={{ wordBreak: 'break-all' }}
+            >
+              {newProjectResult.includes('API Key:') ? (
+                <>
+                  {newProjectResult.split('API Key:')[0]}<br />
+                  <span style={{ display: 'block', fontFamily: 'monospace', marginTop: 4 }}>
+                    {newProjectResult.split('API Key:')[1]}
+                  </span>
+                </>
+              ) : newProjectResult}
             </div>
           )}
             </form>
