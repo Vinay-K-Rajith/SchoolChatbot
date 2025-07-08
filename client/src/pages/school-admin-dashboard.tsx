@@ -37,7 +37,6 @@ export default function SchoolAdminDashboard() {
   const [showAddSchool, setShowAddSchool] = useState(false);
   const [projects, setProjects] = useState<any[]>([]); // List of schools/projects
   const [apiKey, setApiKey] = useState("");
-  const [embedCode, setEmbedCode] = useState("");
   const [newProject, setNewProject] = useState({ code: "", name: "", geminiApiKey: "" });
   const [newProjectResult, setNewProjectResult] = useState<string | null>(null);
 
@@ -52,7 +51,6 @@ export default function SchoolAdminDashboard() {
     overview: '',
     webchat: 'Available',
     apiKey: '',
-    embedCode: '',
     conversationHistory: '0 conversations',
     knowledgeBase: '',
     questions: '',
@@ -87,6 +85,13 @@ export default function SchoolAdminDashboard() {
   // Add state for unanswered messages
   const [unansweredMessages, setUnansweredMessages] = useState<any[]>([]);
   const [unansweredLoading, setUnansweredLoading] = useState(false);
+
+  // Add local state for editable Gemini API key and update status
+  const [editableGeminiApiKey, setEditableGeminiApiKey] = useState('');
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+
+  // Add state for embed code copy feedback
+  const [copied, setCopied] = useState(false);
 
   // Fetch daily usage and update pie chart data when schools change
   useEffect(() => {
@@ -174,6 +179,41 @@ export default function SchoolAdminDashboard() {
     }
   }, [activeTab, selectedSchoolCode]);
 
+  // Fetch Gemini API key when selectedSchoolCode changes
+  useEffect(() => {
+    if (!selectedSchoolCode) {
+      setEditableGeminiApiKey('');
+      return;
+    }
+    // Fetch school info from backend
+    fetch(`/api/school/${selectedSchoolCode}`)
+      .then(r => r.json())
+      .then(data => {
+        setEditableGeminiApiKey(data.geminiApiKey || '');
+      });
+  }, [selectedSchoolCode]);
+
+  // Update Gemini API key handler
+  const handleUpdateGeminiApiKey = async () => {
+    if (!selectedSchoolCode) return;
+    setUpdateStatus(null);
+    try {
+      const res = await fetch(`/api/school/${selectedSchoolCode}/gemini-api-key`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ geminiApiKey: editableGeminiApiKey })
+      });
+      if (res.ok) {
+        setUpdateStatus('Gemini API key updated successfully!');
+      } else {
+        const err = await res.json();
+        setUpdateStatus('Error: ' + (err.error || 'Failed to update'));
+      }
+    } catch (err) {
+      setUpdateStatus('Error: Failed to update');
+    }
+  };
+
   const handleLogout = async () => {
     document.cookie = "schoolAdmin=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     setLocation("/school-admin");
@@ -197,8 +237,8 @@ export default function SchoolAdminDashboard() {
 
       if (response.ok) {
         const result = await response.json();
-        setNewProjectResult(`Project created successfully! API Key: ${result.apiKey}`);
-      setNewProject({ code: "", name: "", geminiApiKey: "" });
+        setNewProjectResult(`School created successfully! API Key: ${result.apiKey}`);
+        setNewProject({ code: "", name: "", geminiApiKey: "" });
         
         // Refresh schools data
         const schoolsResponse = await fetch("/api/school-admin/schools");
@@ -206,11 +246,11 @@ export default function SchoolAdminDashboard() {
         setSchools(schoolsData.schools || []);
       } else {
         const errorData = await response.json();
-        setNewProjectResult(`Error: ${errorData.error}`);
+        setNewProjectResult(`Error creating school: ${errorData.error}`);
       }
     } catch (error) {
-      console.error("Error creating project:", error);
-      setNewProjectResult("Error creating project");
+      console.error("Error creating school:", error);
+      setNewProjectResult("Error creating school");
     }
   };
 
@@ -242,7 +282,6 @@ export default function SchoolAdminDashboard() {
             overview: '',
             webchat: 'Available',
             apiKey: '',
-            embedCode: '',
             conversationHistory: '0 conversations',
             knowledgeBase: '',
             questions: '',
@@ -368,14 +407,6 @@ export default function SchoolAdminDashboard() {
           <h2 className="text-2xl font-bold text-gray-900">
             {activeTab === 'overview' ? 'Dashboard' : activeTab === 'webchat' ? 'Webchat/API Key' : activeTab === 'chat' ? 'Conversation History' : activeTab === 'kb' ? 'Knowledge Base' : activeTab === 'unanswered' ? 'Unanswered Questions' : activeTab === 'reports' ? 'Reports/Usage' : activeTab === 'newproject' ? 'New Project' : 'Dashboard'}
           </h2>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-sm text-gray-500">Showing:</span>
-            <select className="text-sm border border-gray-300 rounded px-2 py-1">
-              <option>This year</option>
-              <option>Last year</option>
-              <option>This month</option>
-            </select>
-          </div>
         </div>
         <div className="flex items-center gap-4">
           <div className="relative">
@@ -544,48 +575,6 @@ export default function SchoolAdminDashboard() {
         </div>
       </div>
     </div>
-  );
-
-  const renderWebchat = () => (
-    !selectedSchoolCode ? (
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 text-center">
-        <p className="text-gray-500">Please select a school to view Webchat/API Key info.</p>
-      </div>
-    ) : schoolLoading ? (
-      <div className="flex items-center justify-center h-32"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
-    ) : (
-      <div className="space-y-6">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Webchat / API Key / Embed</h3>
-          <p className="text-sm text-gray-500 mb-6">Manage your API keys and get the embed code for your webchat widget.</p>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">API Key</label>
-              <input
-                type="text"
-                value={selectedSchool?.apiKey || ''}
-                readOnly
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
-                placeholder="Your API key will appear here"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Embed Code</label>
-              <textarea
-                value={selectedSchool?.embedCode || ''}
-                readOnly
-                rows={3}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 font-mono text-sm"
-                placeholder="Your embed code will appear here"
-              />
-            </div>
-            <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
-              Regenerate API Key
-            </button>
-          </div>
-        </div>
-      </div>
-    )
   );
 
   const renderConversationHistory = () => (
@@ -766,30 +755,30 @@ export default function SchoolAdminDashboard() {
   const renderNewProject = () => (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 max-w-2xl">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">New Project Creation</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">New School Addition</h3>
         <form onSubmit={handleNewProject} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Project Code</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">School Code</label>
             <input
               type="text"
-                value={newProject.code}
-                onChange={e => setNewProject(p => ({ ...p, code: e.target.value }))}
+              value={newProject.code}
+              onChange={e => setNewProject(p => ({ ...p, code: e.target.value }))}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="e.g., PROJ001"
-                required
-              />
+              placeholder="e.g., SXSRB"
+              required
+            />
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Project Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">School Name</label>
             <input
               type="text"
-                value={newProject.name}
-                onChange={e => setNewProject(p => ({ ...p, name: e.target.value }))}
+              value={newProject.name}
+              onChange={e => setNewProject(p => ({ ...p, name: e.target.value }))}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Enter project name"
-                required
-              />
+              placeholder="Enter school name"
+              required
+            />
           </div>
           
           <div>
@@ -808,7 +797,7 @@ export default function SchoolAdminDashboard() {
             type="submit" 
             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
-            Create Project
+            Add School
           </button>
           
           {newProjectResult && (
@@ -885,18 +874,6 @@ export default function SchoolAdminDashboard() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Knowledge Base</label>
                     <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{school.knowledgeBase}</p>
                   </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Embed Code</label>
-                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg font-mono">{school.embedCode}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Common Questions</label>
-                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{school.questions}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Remarks</label>
-                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{school.remarks}</p>
-                  </div>
                 </div>
               </div>
             )}
@@ -969,36 +946,6 @@ export default function SchoolAdminDashboard() {
             placeholder="Knowledge base description"
           />
         </div>
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Embed Code</label>
-          <textarea
-            value={newSchool.embedCode}
-            onChange={(e) => setNewSchool({...newSchool, embedCode: e.target.value})}
-            rows={2}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="HTML embed code"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Common Questions</label>
-          <input
-            type="text"
-            value={newSchool.questions}
-            onChange={(e) => setNewSchool({...newSchool, questions: e.target.value})}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Types of questions received"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Remarks</label>
-          <input
-            type="text"
-            value={newSchool.remarks}
-            onChange={(e) => setNewSchool({...newSchool, remarks: e.target.value})}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Additional notes"
-          />
-        </div>
       </div>
       
       <div className="flex gap-3 mt-6">
@@ -1017,6 +964,78 @@ export default function SchoolAdminDashboard() {
       </div>
     </div>
   );
+
+  const renderWebchat = () => {
+    const embedCode = selectedSchoolCode
+      ? `<script src="https://chat.entab.net/${selectedSchoolCode}/inject.js"></script>`
+      : "";
+
+    const handleCopyEmbed = () => {
+      if (embedCode) {
+        navigator.clipboard.writeText(embedCode);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1000);
+      }
+    };
+
+    return (
+      !selectedSchoolCode ? (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 text-center">
+          <p className="text-gray-500">Please select a school to view Webchat/API Key info.</p>
+        </div>
+      ) : schoolLoading ? (
+        <div className="flex items-center justify-center h-32"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
+      ) : (
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Webchat / API Key / Embed</h3>
+            <p className="text-sm text-gray-500 mb-6">Manage your API keys and get the embed code for your webchat widget.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Gemini API Key</label>
+                <input
+                  type="text"
+                  value={editableGeminiApiKey}
+                  onChange={e => setEditableGeminiApiKey(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                  placeholder="Your Gemini API key will appear here"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Embed Code</label>
+                <div className="relative">
+                  <textarea
+                    value={embedCode}
+                    readOnly
+                    rows={2}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 font-mono text-sm"
+                    placeholder="Your embed code will appear here"
+                  />
+                  <button
+                    onClick={handleCopyEmbed}
+                    className="absolute top-2 right-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
+                    title="Copy to clipboard"
+                  >
+                    {copied ? "✔️" : "📋"}
+                  </button>
+                </div>
+              </div>
+              <button
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                onClick={handleUpdateGeminiApiKey}
+                type="button"
+              >
+                Update API Key
+              </button>
+              {updateStatus && (
+                <div className={`mt-2 text-sm ${updateStatus.startsWith('Error') ? 'text-red-600' : 'text-green-600'}`}>{updateStatus}</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex">

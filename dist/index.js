@@ -1,5 +1,76 @@
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
+  get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
+}) : x)(function(x) {
+  if (typeof require !== "undefined") return require.apply(this, arguments);
+  throw Error('Dynamic require of "' + x + '" is not supported');
+});
+var __commonJS = (cb, mod) => function __require2() {
+  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+
+// server/services/apiKeyService.cjs
+var require_apiKeyService = __commonJS({
+  "server/services/apiKeyService.cjs"(exports, module) {
+    "use strict";
+    var crypto = __require("crypto");
+    var { MongoClient: MongoClient4, ObjectId: ObjectId2 } = __require("mongodb");
+    var client3 = new MongoClient4(process.env.MONGODB_URI);
+    var ApiKeyService2 = class {
+      static generateApiKey(schoolId) {
+        return `sk_${schoolId}_${crypto.randomBytes(32).toString("hex")}`;
+      }
+      static generateApiSecret() {
+        return crypto.randomBytes(48).toString("hex");
+      }
+      static async createApiKeyForSchool(schoolId) {
+        const apiKey = this.generateApiKey(schoolId);
+        const apiSecret = this.generateApiSecret();
+        await client3.connect();
+        const db = client3.db();
+        await db.collection("schools").updateOne(
+          { _id: new ObjectId2(schoolId) },
+          { $set: { api_key: apiKey, api_secret: apiSecret } }
+        );
+        return { apiKey, apiSecret };
+      }
+      static async validateApiKey(apiKey) {
+        await client3.connect();
+        const db = client3.db();
+        const school = await db.collection("schools").findOne({ api_key: apiKey, status: "active" });
+        return school;
+      }
+      static async rotateApiKey(schoolId) {
+        return this.createApiKeyForSchool(schoolId);
+      }
+    };
+    module.exports = ApiKeyService2;
+  }
+});
+
 // server/index.ts
-import express2 from "express";
+import express3 from "express";
 
 // server/routes.ts
 import { createServer } from "http";
@@ -91,10 +162,17 @@ import dotenv from "dotenv";
 dotenv.config();
 var uri = process.env.MONGODB_URI || "";
 var client = new MongoClient(uri);
-async function getSchoolData(schoolCode) {
+async function getSchoolContext(schoolCode) {
   await client.connect();
   const db = client.db("test");
   const collection = db.collection("school_data");
+  const school = await collection.findOne({ schoolCode });
+  return school;
+}
+async function getSchoolAuth(schoolCode) {
+  await client.connect();
+  const db = client.db("test");
+  const collection = db.collection("schools");
   const school = await collection.findOne({ schoolCode });
   return school;
 }
@@ -132,10 +210,13 @@ async function countMessagesBySession(sessionId, schoolCode) {
 // server/services/gemini.ts
 import dotenv2 from "dotenv";
 dotenv2.config();
-var genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
 async function generateResponse(userMessage, sessionId, schoolCode = "SXSBT") {
   try {
-    const schoolContext = await getSchoolData(schoolCode);
+    const schoolContext = await getSchoolContext(schoolCode);
+    const schoolAuth = await getSchoolAuth(schoolCode);
+    if (!schoolAuth || !schoolAuth.geminiApiKey) {
+      return "Sorry, this school's Gemini API key is not configured.";
+    }
     const systemPrompt = `You are an AI assistant for a School. You help students and parents with enquiries about the school.
 
 School context:
@@ -143,6 +224,7 @@ ${JSON.stringify(schoolContext, null, 2)}
 
 Be concise, accurate, and helpful.Use proper formatting with emojis and bullet points for better readability.Be clear and concise but compelling in your responses. never use table to give output
 `;
+    const genAI = new GoogleGenerativeAI(schoolAuth.geminiApiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite-preview-06-17" });
     const chat = model.startChat({
       history: [
@@ -162,8 +244,12 @@ Be concise, accurate, and helpful.Use proper formatting with emojis and bullet p
     return "Sorry, there was an error generating a response.";
   }
 }
-async function updateKnowledgeBaseWithGemini(currentKnowledgeBase, newInput) {
+async function updateKnowledgeBaseWithGemini(currentKnowledgeBase, newInput, schoolCode) {
   try {
+    const schoolAuth = await getSchoolAuth(schoolCode);
+    if (!schoolAuth || !schoolAuth.geminiApiKey) {
+      throw new Error("This school's Gemini API key is not configured.");
+    }
     const systemPrompt = `You are an expert school admin assistant. Here is the current knowledge base for the school as JSON:
 ${JSON.stringify(currentKnowledgeBase, null, 2)}
 
@@ -171,6 +257,7 @@ Here is new information to add or update (text and optional image URL):
 ${JSON.stringify(newInput, null, 2)}
 
 Return the updated knowledge base as a JSON object. Only return valid JSON, no explanations.`;
+    const genAI = new GoogleGenerativeAI(schoolAuth.geminiApiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite-preview-06-17" });
     const chat = model.startChat({
       history: [
@@ -200,12 +287,62 @@ Return the updated knowledge base as a JSON object. Only return valid JSON, no e
 
 // server/routes.ts
 import { nanoid } from "nanoid";
-import { MongoClient as MongoClient2 } from "mongodb";
+import { MongoClient as MongoClient3 } from "mongodb";
 import requestIp from "request-ip";
 import dotenv3 from "dotenv";
 import { GoogleGenerativeAI as GoogleGenerativeAI2 } from "@google/generative-ai";
 import { marked } from "marked";
 import cookieParser from "cookie-parser";
+
+// server/routes/adminSchools.ts
+var import_apiKeyService = __toESM(require_apiKeyService(), 1);
+import express from "express";
+import { MongoClient as MongoClient2 } from "mongodb";
+var router = express.Router();
+var client2 = new MongoClient2(process.env.MONGODB_URI);
+router.post("/schools", async (req, res) => {
+  const { code, name, geminiApiKey } = req.body;
+  if (!code || !name || !geminiApiKey) {
+    return res.status(400).json({ error: "All fields required" });
+  }
+  await client2.connect();
+  const db = client2.db();
+  const existing = await db.collection("schools").findOne({ schoolCode: code });
+  if (existing) return res.status(409).json({ error: "School code already exists" });
+  const schoolDoc = {
+    schoolCode: code,
+    name,
+    geminiApiKey,
+    status: "active",
+    created_at: /* @__PURE__ */ new Date(),
+    updated_at: /* @__PURE__ */ new Date()
+  };
+  const schoolResult = await db.collection("schools").insertOne(schoolDoc);
+  const schoolId = schoolResult.insertedId;
+  const { apiKey, apiSecret } = await import_apiKeyService.default.createApiKeyForSchool(schoolId.toString());
+  await db.collection("schools").updateOne(
+    { _id: schoolId },
+    { $set: { api_key: apiKey, api_secret: apiSecret } }
+  );
+  await db.collection("school_data").insertOne({
+    schoolCode: code,
+    school: { name }
+  });
+  res.status(201).json({
+    schoolId,
+    apiKey,
+    embedCode: `<script src="https://yourdomain.com/${code}/inject.js"></script>`
+  });
+});
+router.get("/schools", async (_req, res) => {
+  await client2.connect();
+  const db = client2.db();
+  const schools = await db.collection("schools").find({}).toArray();
+  res.json({ schools });
+});
+var adminSchools_default = router;
+
+// server/routes.ts
 dotenv3.config();
 var schoolViews = {};
 var schoolActiveViewers = {};
@@ -275,9 +412,18 @@ async function registerRoutes(app2) {
   app2.get("/api/school/:schoolCode", async (req, res) => {
     const { schoolCode } = req.params;
     try {
-      const school = await getSchoolData(schoolCode);
-      if (!school) return res.status(404).json({ error: "School not found" });
-      res.json(school);
+      const schoolContext = await getSchoolContext(schoolCode);
+      if (!schoolContext) return res.status(404).json({ error: "School not found" });
+      const uri2 = process.env.MONGODB_URI || "";
+      const client3 = new MongoClient3(uri2);
+      await client3.connect();
+      const db = client3.db("test");
+      const schoolAuth = await db.collection("schools").findOne({ schoolCode });
+      await client3.close();
+      res.json({
+        ...schoolContext,
+        geminiApiKey: schoolAuth?.geminiApiKey || ""
+      });
     } catch (err) {
       res.status(500).json({ error: "Server error" });
     }
@@ -285,7 +431,7 @@ async function registerRoutes(app2) {
   app2.get("/api/school/:schoolCode/images", async (req, res) => {
     const { schoolCode } = req.params;
     try {
-      const school = await getSchoolData(schoolCode);
+      const school = await getSchoolContext(schoolCode);
       if (!school) return res.status(404).json({ error: "School not found" });
       const images = (school.school?.images || []).map((img) => ({
         url: img.url || img,
@@ -299,7 +445,7 @@ async function registerRoutes(app2) {
   app2.get("/api/school/:schoolCode/image-keywords", async (req, res) => {
     const { schoolCode } = req.params;
     try {
-      const school = await getSchoolData(schoolCode);
+      const school = await getSchoolContext(schoolCode);
       if (!school) return res.status(404).json({ error: "School not found" });
       const keywords = (school.school?.images || []).map((img) => img.keyword || img.alt || img.caption || null).filter(Boolean);
       res.json({ keywords });
@@ -330,13 +476,13 @@ async function registerRoutes(app2) {
     const { schoolCode } = req.params;
     const { text, image } = req.body;
     try {
-      const school = await getSchoolData(schoolCode);
-      const currentKnowledgeBase = school?.knowledgeBase || {};
-      const updatedKnowledgeBase = await updateKnowledgeBaseWithGemini(currentKnowledgeBase, { text, image });
+      const schoolContext = await getSchoolContext(schoolCode);
+      const currentKnowledgeBase = schoolContext?.knowledgeBase || {};
+      const updatedKnowledgeBase = await updateKnowledgeBaseWithGemini(currentKnowledgeBase, { text, image }, schoolCode);
       const uri2 = process.env.MONGODB_URI || "";
-      const client2 = new MongoClient2(uri2);
-      await client2.connect();
-      const db = client2.db("test");
+      const client3 = new MongoClient3(uri2);
+      await client3.connect();
+      const db = client3.db("test");
       const collection = db.collection("school_data");
       await collection.updateOne(
         { schoolCode },
@@ -351,10 +497,10 @@ async function registerRoutes(app2) {
   app2.get("/api/school/:schoolCode/metrics", async (req, res) => {
     const { schoolCode } = req.params;
     const uri2 = process.env.MONGODB_URI || "";
-    const client2 = new MongoClient2(uri2);
+    const client3 = new MongoClient3(uri2);
     try {
-      await client2.connect();
-      const db = client2.db("test");
+      await client3.connect();
+      const db = client3.db("test");
       const sessionsCollection = db.collection("chat_sessions");
       const messagesCollection = db.collection("chat_messages");
       const totalSessions = await sessionsCollection.countDocuments({ schoolCode });
@@ -370,7 +516,7 @@ async function registerRoutes(app2) {
       console.error("Error fetching metrics from DB:", err);
       res.status(500).json({ error: "Failed to fetch metrics" });
     } finally {
-      await client2.close();
+      await client3.close();
     }
   });
   app2.get("/api/school/:schoolCode/recent-activity", async (req, res) => {
@@ -518,12 +664,16 @@ async function registerRoutes(app2) {
   app2.get("/api/school/:schoolCode/knowledge-base-formatted", async (req, res) => {
     const { schoolCode } = req.params;
     try {
-      const school = await getSchoolData(schoolCode);
-      if (!school || Object.keys(school).length === 0) {
+      const schoolContext = await getSchoolContext(schoolCode);
+      if (!schoolContext || Object.keys(schoolContext).length === 0) {
         return res.json({ formatted: "<span style='color:#888'>No knowledge base found for this school.</span>" });
       }
-      const genAI2 = new GoogleGenerativeAI2(process.env.GOOGLE_API_KEY || "AIzaSyD2u1YsYP5eWNhzREAHc3hsnLtvD0ImVKI");
-      const model = genAI2.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const schoolAuth = await getSchoolAuth(schoolCode);
+      if (!schoolAuth || !schoolAuth.geminiApiKey) {
+        return res.status(500).json({ error: "Gemini API key not configured for this school." });
+      }
+      const genAI = new GoogleGenerativeAI2(schoolAuth.geminiApiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       const prompt = `Format the following school context as a knowledge base for display to users.
 
 - Start directly with the school name and its information, do not include any introduction or summary line.
@@ -532,7 +682,7 @@ async function registerRoutes(app2) {
 - Do not use tables.
 
 School Context:
-${JSON.stringify(school, null, 2)}`;
+${JSON.stringify(schoolContext, null, 2)}`;
       const chat = model.startChat({
         history: [
           { role: "user", parts: [{ text: prompt }] }
@@ -566,9 +716,9 @@ ${JSON.stringify(school, null, 2)}`;
   app2.get("/api/school-admin/schools", async (req, res) => {
     try {
       const uri2 = process.env.MONGODB_URI || "";
-      const client2 = new MongoClient2(uri2);
-      await client2.connect();
-      const db = client2.db("test");
+      const client3 = new MongoClient3(uri2);
+      await client3.connect();
+      const db = client3.db("test");
       const schoolData = await db.collection("school_data").find({}).toArray();
       const schoolsWithData = await Promise.all(schoolData.map(async (doc) => {
         const code = doc.schoolCode;
@@ -589,7 +739,7 @@ ${JSON.stringify(school, null, 2)}`;
         if (b.totalSessions !== a.totalSessions) return b.totalSessions - a.totalSessions;
         return b.totalMessages - a.totalMessages;
       });
-      await client2.close();
+      await client3.close();
       res.json({ schools: schoolsWithData });
     } catch (err) {
       console.error("Error fetching schools:", err);
@@ -599,9 +749,9 @@ ${JSON.stringify(school, null, 2)}`;
   app2.get("/api/school-admin/analytics", async (req, res) => {
     try {
       const uri2 = process.env.MONGODB_URI || "";
-      const client2 = new MongoClient2(uri2);
-      await client2.connect();
-      const db = client2.db("test");
+      const client3 = new MongoClient3(uri2);
+      await client3.connect();
+      const db = client3.db("test");
       const schoolsCollection = db.collection("schools");
       const sessionsCollection = db.collection("chat_sessions");
       const messagesCollection = db.collection("chat_messages");
@@ -619,7 +769,7 @@ ${JSON.stringify(school, null, 2)}`;
           totalUsers: totalUsers.length
         }
       });
-      await client2.close();
+      await client3.close();
     } catch (err) {
       console.error("Error fetching analytics:", err);
       res.status(500).json({ error: "Failed to fetch analytics" });
@@ -628,15 +778,15 @@ ${JSON.stringify(school, null, 2)}`;
   app2.get("/api/school-admin/school-data-list", async (req, res) => {
     try {
       const uri2 = process.env.MONGODB_URI || "";
-      const client2 = new MongoClient2(uri2);
-      await client2.connect();
-      const db = client2.db("test");
+      const client3 = new MongoClient3(uri2);
+      await client3.connect();
+      const db = client3.db("test");
       const schoolData = await db.collection("school_data").find({}).toArray();
       const result = schoolData.map((doc) => ({
         schoolCode: doc.schoolCode,
         name: doc.school && doc.school.name ? doc.school.name : doc.schoolCode
       }));
-      await client2.close();
+      await client3.close();
       res.json({ schools: result });
     } catch (err) {
       console.error("Error fetching school_data list:", err);
@@ -646,9 +796,9 @@ ${JSON.stringify(school, null, 2)}`;
   app2.get("/api/school-admin/daily-usage", async (req, res) => {
     try {
       const uri2 = process.env.MONGODB_URI || "";
-      const client2 = new MongoClient2(uri2);
-      await client2.connect();
-      const db = client2.db("test");
+      const client3 = new MongoClient3(uri2);
+      await client3.connect();
+      const db = client3.db("test");
       const messagesCollection = db.collection("chat_messages");
       const startDate = /* @__PURE__ */ new Date();
       startDate.setDate(startDate.getDate() - 29);
@@ -671,7 +821,7 @@ ${JSON.stringify(school, null, 2)}`;
         const found = results.find((r) => r._id === dateStr);
         usage.push({ date: dateStr, count: found ? found.count : 0 });
       }
-      await client2.close();
+      await client3.close();
       res.json({ usage });
     } catch (err) {
       console.error("Error fetching daily usage:", err);
@@ -682,9 +832,9 @@ ${JSON.stringify(school, null, 2)}`;
     const { schoolCode } = req.params;
     try {
       const uri2 = process.env.MONGODB_URI || "";
-      const client2 = new MongoClient2(uri2);
-      await client2.connect();
-      const db = client2.db("test");
+      const client3 = new MongoClient3(uri2);
+      await client3.connect();
+      const db = client3.db("test");
       const messagesCollection = db.collection("chat_messages");
       const phrases = [
         "I don't have",
@@ -711,19 +861,43 @@ ${JSON.stringify(school, null, 2)}`;
           timestamp: botMsg.timestamp
         };
       }));
-      await client2.close();
+      await client3.close();
       res.json({ messages: results });
     } catch (err) {
       console.error("Error fetching unanswered messages:", err);
       res.status(500).json({ error: "Failed to fetch unanswered messages" });
     }
   });
+  app2.patch("/api/school/:schoolCode/gemini-api-key", async (req, res) => {
+    const { schoolCode } = req.params;
+    const { geminiApiKey } = req.body;
+    if (!geminiApiKey) return res.status(400).json({ error: "Gemini API key required" });
+    try {
+      const uri2 = process.env.MONGODB_URI || "";
+      const client3 = new MongoClient3(uri2);
+      await client3.connect();
+      const db = client3.db("test");
+      const result = await db.collection("schools").updateOne(
+        { schoolCode },
+        { $set: { geminiApiKey } }
+      );
+      await client3.close();
+      if (result.modifiedCount === 1) {
+        res.json({ success: true, geminiApiKey });
+      } else {
+        res.status(404).json({ error: "School not found" });
+      }
+    } catch (err) {
+      res.status(500).json({ error: "Failed to update Gemini API key" });
+    }
+  });
+  app2.use("/api/admin", adminSchools_default);
   const httpServer = createServer(app2);
   return httpServer;
 }
 
 // server/vite.ts
-import express from "express";
+import express2 from "express";
 import fs from "fs";
 import path2 from "path";
 import { createServer as createViteServer, createLogger } from "vite";
@@ -840,7 +1014,7 @@ function serveStatic(app2) {
       `Could not find the build directory: ${distPath}, make sure to build the client first`
     );
   }
-  app2.use(express.static(distPath));
+  app2.use(express2.static(distPath));
   app2.use("*", (_req, res) => {
     res.sendFile(path2.resolve(distPath, "index.html"));
   });
@@ -851,11 +1025,11 @@ import path3 from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
 var __filename2 = fileURLToPath2(import.meta.url);
 var __dirname2 = path3.dirname(__filename2);
-var app = express2();
-app.use(express2.json());
-app.use(express2.urlencoded({ extended: false }));
-app.use(express2.static("dist"));
-app.use("/static", express2.static(path3.join(__dirname2, "../dist")));
+var app = express3();
+app.use(express3.json());
+app.use(express3.urlencoded({ extended: false }));
+app.use(express3.static("dist"));
+app.use("/static", express3.static(path3.join(__dirname2, "../dist")));
 app.use((req, res, next) => {
   const start = Date.now();
   const path4 = req.path;

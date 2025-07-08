@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { insertChatMessageSchema, insertChatSessionSchema } from "@shared/schema";
 import { generateResponse, updateKnowledgeBaseWithGemini } from "./services/gemini";
 import { nanoid } from "nanoid";
-import { getSchoolData, getAllSessionsBySchool, getMessagesBySession, storeSession, storeMessage, countMessagesBySession } from "./services/school-context";
+import { getSchoolContext, getSchoolAuth, getAllSessionsBySchool, getMessagesBySession, storeSession, storeMessage, countMessagesBySession } from "./services/school-context";
 import { MongoClient } from "mongodb";
 // @ts-ignore
 import requestIp from "request-ip";
@@ -13,6 +13,7 @@ import dotenv from "dotenv";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { marked } from "marked";
 import cookieParser from "cookie-parser";
+import adminSchoolsRouter from './routes/adminSchools';
 dotenv.config();
 
 // In-memory view tracking per school
@@ -103,9 +104,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/school/:schoolCode", async (req, res) => {
     const { schoolCode } = req.params;
     try {
-      const school = await getSchoolData(schoolCode);
-      if (!school) return res.status(404).json({ error: "School not found" });
-      res.json(school);
+      const schoolContext = await getSchoolContext(schoolCode);
+      if (!schoolContext) return res.status(404).json({ error: "School not found" });
+
+      // Fetch Gemini API key from schools collection
+      const uri = process.env.MONGODB_URI || "";
+      const client = new MongoClient(uri);
+      await client.connect();
+      const db = client.db("test");
+      const schoolAuth = await db.collection("schools").findOne({ schoolCode });
+      await client.close();
+
+      res.json({
+        ...schoolContext,
+        geminiApiKey: schoolAuth?.geminiApiKey || ""
+      });
     } catch (err) {
       res.status(500).json({ error: "Server error" });
     }
@@ -114,7 +127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/school/:schoolCode/images", async (req, res) => {
     const { schoolCode } = req.params;
     try {
-      const school = await getSchoolData(schoolCode);
+      const school = await getSchoolContext(schoolCode);
       if (!school) return res.status(404).json({ error: "School not found" });
       const images = (school.school?.images || []).map((img: any) => ({
         url: img.url || img,
@@ -129,7 +142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/school/:schoolCode/image-keywords", async (req, res) => {
     const { schoolCode } = req.params;
     try {
-      const school = await getSchoolData(schoolCode);
+      const school = await getSchoolContext(schoolCode);
       if (!school) return res.status(404).json({ error: "School not found" });
       const keywords = (school.school?.images || [])
         .map((img: any) => img.keyword || img.alt || img.caption || null)
@@ -169,11 +182,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { schoolCode } = req.params;
     const { text, image } = req.body;
     try {
-      // 1. Fetch current school data
-      const school = await getSchoolData(schoolCode);
-      const currentKnowledgeBase = school?.knowledgeBase || {};
-      // 2. Call Gemini to get updated knowledge base
-      const updatedKnowledgeBase = await updateKnowledgeBaseWithGemini(currentKnowledgeBase, { text, image });
+      // 1. Fetch current school context from school_data
+      const schoolContext = await getSchoolContext(schoolCode);
+      const currentKnowledgeBase = schoolContext?.knowledgeBase || {};
+      // 2. Call Gemini to get updated knowledge base (uses getSchoolAuth inside)
+      const updatedKnowledgeBase = await updateKnowledgeBaseWithGemini(currentKnowledgeBase, { text, image }, schoolCode);
       // 3. Update the knowledgeBase field in the DB
       const uri = process.env.MONGODB_URI || "";
       const client = new MongoClient(uri);
@@ -380,14 +393,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/school/:schoolCode/knowledge-base-formatted", async (req, res) => {
     const { schoolCode } = req.params;
     try {
-      const school = await getSchoolData(schoolCode);
-      if (!school || Object.keys(school).length === 0) {
+      const schoolContext = await getSchoolContext(schoolCode);
+      if (!schoolContext || Object.keys(schoolContext).length === 0) {
         return res.json({ formatted: "<span style='color:#888'>No knowledge base found for this school.</span>" });
       }
-      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "AIzaSyD2u1YsYP5eWNhzREAHc3hsnLtvD0ImVKI");
+      const schoolAuth = await getSchoolAuth(schoolCode);
+      if (!schoolAuth || !schoolAuth.geminiApiKey) {
+        return res.status(500).json({ error: "Gemini API key not configured for this school." });
+      }
+      const genAI = new GoogleGenerativeAI(schoolAuth.geminiApiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       // Improved prompt: ask Gemini to start directly with the school name and info, and include all available fields
-      const prompt = `Format the following school context as a knowledge base for display to users.\n\n- Start directly with the school name and its information, do not include any introduction or summary line.\n- Present all available information and fields from the database.\n- Use clear sections, bullet points, and emojis where appropriate.\n- Do not use tables.\n\nSchool Context:\n${JSON.stringify(school, null, 2)}`;
+      const prompt = `Format the following school context as a knowledge base for display to users.\n\n- Start directly with the school name and its information, do not include any introduction or summary line.\n- Present all available information and fields from the database.\n- Use clear sections, bullet points, and emojis where appropriate.\n- Do not use tables.\n\nSchool Context:\n${JSON.stringify(schoolContext, null, 2)}`;
       const chat = model.startChat({
         history: [
           { role: "user", parts: [{ text: prompt }] },
@@ -600,6 +617,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch unanswered messages" });
     }
   });
+
+  // PATCH endpoint to update Gemini API key for a school
+  app.patch("/api/school/:schoolCode/gemini-api-key", async (req, res) => {
+    const { schoolCode } = req.params;
+    const { geminiApiKey } = req.body;
+    if (!geminiApiKey) return res.status(400).json({ error: "Gemini API key required" });
+
+    try {
+      const uri = process.env.MONGODB_URI || "";
+      const client = new MongoClient(uri);
+      await client.connect();
+      const db = client.db("test");
+      const result = await db.collection("schools").updateOne(
+        { schoolCode },
+        { $set: { geminiApiKey } }
+      );
+      await client.close();
+      if (result.modifiedCount === 1) {
+        res.json({ success: true, geminiApiKey });
+      } else {
+        res.status(404).json({ error: "School not found" });
+      }
+    } catch (err) {
+      res.status(500).json({ error: "Failed to update Gemini API key" });
+    }
+  });
+
+  app.use('/api/admin', adminSchoolsRouter);
 
   const httpServer = createServer(app);
   return httpServer;

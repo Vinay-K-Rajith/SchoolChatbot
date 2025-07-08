@@ -22,12 +22,13 @@ WORKDIR /app
 # 7. Copy only necessary files from builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server ./server
+COPY --from=builder /app/server/services/apiKeyService.cjs ./server/services/apiKeyService.cjs
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/node_modules ./node_modules
 
 # 8. Expose the port (change if your server uses a different port)
-EXPOSE 3000
+EXPOSE 5173
 
 # 9. Start the server
-CMD ["node", "dist/index.js"] 
+CMD ["node", "--enable-source-maps", "dist/index.js"] 

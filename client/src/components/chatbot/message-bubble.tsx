@@ -230,7 +230,7 @@ export function MessageBubble({ content, isUser, timestamp, schoolCode, availabl
       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0 ${isUser ? 'bg-school-orange' : 'bg-school-blue'}`}>
         {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
       </div>
-      <div className={`rounded-2xl p-4 max-w-[85%] ${isUser ? 'bg-school-blue text-white rounded-tr-sm' : 'bg-gray-50 rounded-tl-sm border border-gray-200'}`}>
+      <div className={`rounded-2xl p-4 max-w-[98%] ${isUser ? 'bg-school-blue text-white rounded-tr-sm' : 'bg-gray-50 rounded-tl-sm border border-gray-200'}`}>
         <div className={`text-sm leading-relaxed ${isUser ? 'text-white' : 'text-gray-800'}`}>
           {formattedContent}
           {images}

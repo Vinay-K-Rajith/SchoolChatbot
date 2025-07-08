@@ -1,6 +1,8 @@
 import express, { Request, Response } from "express";
 import { MongoClient } from "mongodb";
-import ApiKeyService from "../services/apiKeyService";
+// Replace the import of ApiKeyService with a require statement for ESM compatibility
+// import ApiKeyService from "../services/apiKeyService";
+import ApiKeyService from "../services/apiKeyService.cjs";
 
 const router = express.Router();
 const client = new MongoClient(process.env.MONGODB_URI!);
@@ -14,18 +16,19 @@ router.post("/schools", async (req: Request, res: Response) => {
   await client.connect();
   const db = client.db();
   // Check for duplicate code
-  const existing = await db.collection("schools").findOne({ code });
+  const existing = await db.collection("schools").findOne({ schoolCode: code });
   if (existing) return res.status(409).json({ error: "School code already exists" });
 
-  // Insert school first to get _id
-  const schoolResult = await db.collection("schools").insertOne({
-    code,
+  // Insert into schools collection
+  const schoolDoc = {
+    schoolCode: code,
     name,
     geminiApiKey,
     status: "active",
     created_at: new Date(),
     updated_at: new Date(),
-  });
+  };
+  const schoolResult = await db.collection("schools").insertOne(schoolDoc);
   const schoolId = schoolResult.insertedId;
   // Generate API key/secret and update school
   const { apiKey, apiSecret } = await ApiKeyService.createApiKeyForSchool(schoolId.toString());
@@ -33,6 +36,13 @@ router.post("/schools", async (req: Request, res: Response) => {
     { _id: schoolId },
     { $set: { api_key: apiKey, api_secret: apiSecret } }
   );
+
+  // Insert into school_data collection
+  await db.collection("school_data").insertOne({
+    schoolCode: code,
+    school: { name }
+  });
+
   res.status(201).json({
     schoolId,
     apiKey,

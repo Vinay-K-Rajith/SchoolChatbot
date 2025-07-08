@@ -5,10 +5,18 @@ dotenv.config();
 const uri = process.env.MONGODB_URI || "";
 const client = new MongoClient(uri);
 
-export async function getSchoolData(schoolCode: string) {
+export async function getSchoolContext(schoolCode: string) {
   await client.connect();
   const db = client.db("test");
   const collection = db.collection("school_data");
+  const school = await collection.findOne({ schoolCode });
+  return school;
+}
+
+export async function getSchoolAuth(schoolCode: string) {
+  await client.connect();
+  const db = client.db("test");
+  const collection = db.collection("schools");
   const school = await collection.findOne({ schoolCode });
   return school;
 }
