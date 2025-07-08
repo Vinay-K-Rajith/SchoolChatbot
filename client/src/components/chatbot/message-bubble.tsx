@@ -4,6 +4,7 @@ import { useMemo, useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
+import React from "react";
 
 interface MessageBubbleProps {
   content: string;
@@ -142,6 +143,24 @@ function formatMessageContent(content: string, isUser: boolean, schoolCode: stri
 export function MessageBubble({ content, isUser, timestamp, schoolCode, availableKeywords }: MessageBubbleProps) {
   const [images, setImages] = useState<JSX.Element[]>([]);
   const [directImageUrls, setDirectImageUrls] = useState<string[]>([]);
+  // Word-by-word animation state
+  const [displayedWords, setDisplayedWords] = useState<string[]>(isUser ? [content] : []);
+
+  useEffect(() => {
+    if (isUser) {
+      setDisplayedWords([content]);
+      return;
+    }
+    const words = content.split(' ');
+    let idx = 0;
+    setDisplayedWords([]);
+    const interval = setInterval(() => {
+      idx++;
+      setDisplayedWords(words.slice(0, idx));
+      if (idx >= words.length) clearInterval(interval);
+    }, 60); // 60ms per word
+    return () => clearInterval(interval);
+  }, [content, isUser]);
 
   useEffect(() => {
     let isMounted = true;
@@ -193,7 +212,7 @@ export function MessageBubble({ content, isUser, timestamp, schoolCode, availabl
           foundDirectUrls.push(url);
         }
       }
-      setDirectImageUrls(foundDirectUrls);
+        setDirectImageUrls(foundDirectUrls);
       if (isMounted) setImages(imgs);
     }
     loadImages();
@@ -201,7 +220,10 @@ export function MessageBubble({ content, isUser, timestamp, schoolCode, availabl
   }, [content, availableKeywords, schoolCode]);
 
   // Your formatting logic for bold, bullets, etc.
-  const formattedContent = useMemo(() => formatBotContent(content, schoolCode, directImageUrls), [content, schoolCode, directImageUrls]);
+  const formattedContent = useMemo(() => {
+    if (isUser) return formatBotContent(content, schoolCode, directImageUrls);
+    return formatBotContent(displayedWords.join(' '), schoolCode, directImageUrls);
+  }, [content, schoolCode, directImageUrls, displayedWords, isUser]);
 
   return (
     <div className={`flex items-start space-x-3 animate-fade-in ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`}>

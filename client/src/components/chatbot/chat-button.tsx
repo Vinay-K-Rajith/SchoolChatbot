@@ -27,6 +27,7 @@ export function ChatButton() {
         <ChatInterface 
           isOpen={isOpen} 
           onClose={() => setIsOpen(false)} 
+          schoolCode={schoolCode}
         />
       )}
     </>

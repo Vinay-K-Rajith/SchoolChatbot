@@ -40,7 +40,7 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentUserId++;
-    const user: User = { ...insertUser, id };
+    const user: User = { ...insertUser, id, schoolId: (insertUser as any).schoolId ?? null };
     this.users.set(id, user);
     return user;
   }
@@ -50,6 +50,7 @@ export class MemStorage implements IStorage {
       id: Date.now(),
       sessionId: insertSession.sessionId,
       schoolCode: insertSession.schoolCode,
+      schoolId: (insertSession as any).schoolId ?? null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -61,10 +62,12 @@ export class MemStorage implements IStorage {
   async createChatMessage(insertMessage: InsertChatMessage): Promise<ChatMessage> {
     const session = this.chatSessions.get(insertMessage.sessionId);
     const schoolCode = insertMessage.schoolCode || (session ? session.schoolCode : "");
+    const schoolId = (insertMessage as any).schoolId ?? (session ? session.schoolId : null);
     const message: ChatMessage = {
       id: this.currentMessageId++,
       sessionId: insertMessage.sessionId,
       schoolCode,
+      schoolId,
       content: insertMessage.content,
       isUser: insertMessage.isUser,
       timestamp: new Date(),

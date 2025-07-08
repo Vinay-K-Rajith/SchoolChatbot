@@ -269,17 +269,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ messages });
   });
 
-  // Serve dynamic inject.js for embeddable widget (loader only, loads static widget JS)
+  // Serve dynamic inject.js for embeddable widget (full widget loader)
   app.get('/:schoolCode/inject.js', (req: any, res: any) => {
     const { schoolCode } = req.params;
-    res.type('application/javascript').send(`
-      (function() {
-        if (window.__schoolChatWidgetLoaded) return;
-        window.__schoolChatWidgetLoaded = true;
-        var script = document.createElement('script');
-        script.src = 'http://127.0.0.1:5173/static/school-chat-widget.js?schoolCode=' + encodeURIComponent('${schoolCode}');
-        document.body.appendChild(script);
-      })();
+    res.type('application/javascript').send(`(function() {
+      if (window.chatbotInjected) return;
+      window.chatbotInjected = true;
+      const config = {
+        chatbotUrl: 'https://e64e37048e6f.ngrok-free.app/${schoolCode}',
+        chatbotTitle: 'EnquiryDesk',
+        buttonIcon: '💬',
+        position: 'bottom-right'
+      };
+      const styles = \`
+        .chatbot-container { position: fixed; bottom: 20px; right: 20px; z-index: 999999; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .chatbot-button { width: 60px; height: 60px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; border-radius: 50%; cursor: pointer; box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4); transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; }
+        .chatbot-button:hover { transform: scale(1.1); box-shadow: 0 6px 25px rgba(102, 126, 234, 0.6); }
+        .chatbot-widget { position: absolute; bottom: 80px; right: 0; width: 400px; height: 600px; background: white; border-radius: 20px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); display: none; flex-direction: column; overflow: hidden; animation: slideUp 0.3s ease; }
+        .chatbot-widget.active { display: flex; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .chatbot-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
+        .chatbot-title { font-weight: bold; font-size: 1.1rem; }
+        .chatbot-close { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.3s ease; }
+        .chatbot-close:hover { background: rgba(255, 255, 255, 0.2); }
+        .chatbot-iframe { flex: 1; border: none; width: 100%; }
+        .chatbot-container.bottom-left { bottom: 20px; left: 20px; right: auto; }
+        .chatbot-container.bottom-left .chatbot-widget { right: auto; left: 0; }
+        .chatbot-container.top-right { top: 20px; bottom: auto; right: 20px; }
+        .chatbot-container.top-right .chatbot-widget { top: 80px; bottom: auto; }
+        .chatbot-container.top-left { top: 20px; bottom: auto; left: 20px; right: auto; }
+        .chatbot-container.top-left .chatbot-widget { top: 80px; bottom: auto; right: auto; left: 0; }
+        @media (max-width: 768px) { .chatbot-widget { width: 90vw; height: 70vh; right: 5vw; } .chatbot-container.bottom-left .chatbot-widget, .chatbot-container.top-left .chatbot-widget { left: 5vw; right: auto; } }
+        @keyframes pulse { 0% { box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4); } 50% { box-shadow: 0 4px 20px rgba(102, 126, 234, 0.8); } 100% { box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4); } }
+        .chatbot-button.pulse { animation: pulse 2s infinite; }
+      \`;
+      const styleSheet = document.createElement('style');
+      styleSheet.textContent = styles;
+      document.head.appendChild(styleSheet);
+      const chatbotHTML = '<div class="chatbot-container ' + config.position + '"><button class="chatbot-button" id="chatbotToggle">' + config.buttonIcon + '</button><div class="chatbot-widget" id="chatbotWidget"><div class="chatbot-header"><div class="chatbot-title">' + config.chatbotTitle + '</div><button class="chatbot-close" id="chatbotClose">×</button></div><iframe class="chatbot-iframe" src="' + config.chatbotUrl + '" title="AI Chatbot"></iframe></div></div>';
+      function initializeChatbot() {
+        const container = document.createElement('div');
+        container.innerHTML = chatbotHTML;
+        document.body.appendChild(container.firstElementChild);
+        const chatbotToggle = document.getElementById('chatbotToggle');
+        const chatbotWidget = document.getElementById('chatbotWidget');
+        const chatbotClose = document.getElementById('chatbotClose');
+        chatbotToggle.addEventListener('click', () => {
+          chatbotWidget.classList.add('active');
+          chatbotToggle.style.display = 'none';
+        });
+        chatbotClose.addEventListener('click', () => {
+          chatbotWidget.classList.remove('active');
+          chatbotToggle.style.display = 'flex';
+        });
+        document.addEventListener('click', (e) => {
+          if (!e.target.closest('.chatbot-container')) {
+            chatbotWidget.classList.remove('active');
+            chatbotToggle.style.display = 'flex';
+          }
+        });
+        const hasSeenChatbot = localStorage.getItem('chatbot-seen');
+        if (!hasSeenChatbot) {
+          chatbotToggle.classList.add('pulse');
+          setTimeout(() => {
+            chatbotToggle.classList.remove('pulse');
+            localStorage.setItem('chatbot-seen', 'true');
+          }, 10000);
+        }
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeChatbot);
+      } else {
+        initializeChatbot();
+      }
+      window.ChatbotConfig = {
+        updateUrl: function(newUrl) {
+          const iframe = document.querySelector('.chatbot-iframe');
+          if (iframe) { iframe.src = newUrl; }
+        },
+        updateTitle: function(newTitle) {
+          const title = document.querySelector('.chatbot-title');
+          if (title) { title.textContent = newTitle; }
+        },
+        updateIcon: function(newIcon) {
+          const button = document.querySelector('.chatbot-button');
+          if (button) { button.textContent = newIcon; }
+        },
+        show: function() {
+          const widget = document.getElementById('chatbotWidget');
+          const toggle = document.getElementById('chatbotToggle');
+          if (widget && toggle) {
+            widget.classList.add('active');
+            toggle.style.display = 'none';
+          }
+        },
+        hide: function() {
+          const widget = document.getElementById('chatbotWidget');
+          const toggle = document.getElementById('chatbotToggle');
+          if (widget && toggle) {
+            widget.classList.remove('active');
+            toggle.style.display = 'flex';
+          }
+        }
+      };
+    })();
     `);
   });
 
@@ -329,6 +422,183 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({ authenticated: true });
     }
     res.json({ authenticated: false });
+  });
+
+  // Get all schools for admin dashboard
+  app.get("/api/school-admin/schools", async (req, res) => {
+    try {
+      const uri = process.env.MONGODB_URI || "";
+      const client = new MongoClient(uri);
+      await client.connect();
+      const db = client.db("test");
+      // Use school_data as the source of truth for all schools
+      const schoolData = await db.collection("school_data").find({}).toArray();
+      const schoolsWithData = await Promise.all(schoolData.map(async (doc) => {
+        const code = doc.schoolCode;
+        const name = (doc.school && doc.school.name) ? doc.school.name : code;
+        const sessionsCollection = db.collection("chat_sessions");
+        const messagesCollection = db.collection("chat_messages");
+        const totalSessions = await sessionsCollection.countDocuments({ schoolCode: code });
+        const totalMessages = await messagesCollection.countDocuments({ schoolCode: code });
+        return {
+          code,
+          name,
+          totalSessions,
+          totalMessages,
+          status: doc.status || 'active',
+        };
+      }));
+      // Sort by totalSessions desc, then totalMessages desc
+      schoolsWithData.sort((a, b) => {
+        if (b.totalSessions !== a.totalSessions) return b.totalSessions - a.totalSessions;
+        return b.totalMessages - a.totalMessages;
+      });
+      await client.close();
+      res.json({ schools: schoolsWithData });
+    } catch (err) {
+      console.error("Error fetching schools:", err);
+      res.status(500).json({ error: "Failed to fetch schools" });
+    }
+  });
+
+  // Get dashboard analytics for admin
+  app.get("/api/school-admin/analytics", async (req, res) => {
+    try {
+      const uri = process.env.MONGODB_URI || "";
+      const client = new MongoClient(uri);
+      await client.connect();
+      const db = client.db("test");
+      
+      const schoolsCollection = db.collection("schools");
+      const sessionsCollection = db.collection("chat_sessions");
+      const messagesCollection = db.collection("chat_messages");
+      
+      const totalSchools = await schoolsCollection.countDocuments({});
+      const totalSessions = await sessionsCollection.countDocuments({});
+      const totalMessages = await messagesCollection.countDocuments({});
+      const totalUsers = await messagesCollection.distinct("sessionId");
+      
+      // Mock revenue data (in real app, this would come from billing system)
+      const totalRevenue = totalSchools * 587.68; // Mock calculation
+      
+      res.json({
+        metrics: {
+          totalRevenue: totalRevenue.toFixed(2),
+          totalSchools,
+          totalSessions,
+          totalMessages,
+          totalUsers: totalUsers.length
+        }
+      });
+      
+      await client.close();
+    } catch (err) {
+      console.error("Error fetching analytics:", err);
+      res.status(500).json({ error: "Failed to fetch analytics" });
+    }
+  });
+
+  // Get all schools from school_data for admin dropdown
+  app.get('/api/school-admin/school-data-list', async (req, res) => {
+    try {
+      const uri = process.env.MONGODB_URI || "";
+      const client = new MongoClient(uri);
+      await client.connect();
+      const db = client.db("test");
+      const schoolData = await db.collection("school_data").find({}).toArray();
+      const result = schoolData.map(doc => ({
+        schoolCode: doc.schoolCode,
+        name: (doc.school && doc.school.name) ? doc.school.name : doc.schoolCode
+      }));
+      await client.close();
+      res.json({ schools: result });
+    } catch (err) {
+      console.error("Error fetching school_data list:", err);
+      res.status(500).json({ error: "Failed to fetch school_data list" });
+    }
+  });
+
+  // Get daily usage (total messages per day across all schools)
+  app.get("/api/school-admin/daily-usage", async (req, res) => {
+    try {
+      const uri = process.env.MONGODB_URI || "";
+      const client = new MongoClient(uri);
+      await client.connect();
+      const db = client.db("test");
+      const messagesCollection = db.collection("chat_messages");
+      // Last 30 days
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 29);
+      startDate.setHours(0, 0, 0, 0);
+      const pipeline = [
+        { $match: { timestamp: { $gte: startDate } } },
+        { $group: {
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } },
+            count: { $sum: 1 }
+        }},
+        { $sort: { _id: 1 } }
+      ];
+      const results = await messagesCollection.aggregate(pipeline).toArray();
+      // Fill missing days with 0
+      const usage: { date: string, count: number }[] = [];
+      const today = new Date();
+      for (let i = 0; i < 30; i++) {
+        const d = new Date(startDate);
+        d.setDate(d.getDate() + i);
+        const dateStr = d.toISOString().slice(0, 10);
+        const found = results.find(r => r._id === dateStr);
+        usage.push({ date: dateStr, count: found ? found.count : 0 });
+      }
+      await client.close();
+      res.json({ usage });
+    } catch (err) {
+      console.error("Error fetching daily usage:", err);
+      res.status(500).json({ error: "Failed to fetch daily usage" });
+    }
+  });
+
+  // Endpoint to get unanswered messages for a school (with user question)
+  app.get("/api/school/:schoolCode/unanswered-messages", async (req, res) => {
+    const { schoolCode } = req.params;
+    try {
+      const uri = process.env.MONGODB_URI || "";
+      const client = new MongoClient(uri);
+      await client.connect();
+      const db = client.db("test");
+      const messagesCollection = db.collection("chat_messages");
+      const phrases = [
+        "I don't have",
+        "I'm sorry",
+        "I cannot provide information",
+        "I cannot fulfill this request"
+      ];
+      const regex = new RegExp(phrases.map(p => p.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')).join("|"), "i");
+      // Find all bot messages matching the phrases
+      const botMessages = await messagesCollection.find({
+        schoolCode,
+        isUser: false,
+        content: { $regex: regex }
+      }).sort({ timestamp: -1 }).toArray();
+      // For each bot message, find the immediately preceding user message in the same session
+      const results = await Promise.all(botMessages.map(async (botMsg) => {
+        const userMsg = await messagesCollection.find({
+          schoolCode,
+          sessionId: botMsg.sessionId,
+          isUser: true,
+          timestamp: { $lt: botMsg.timestamp }
+        }).sort({ timestamp: -1 }).limit(1).toArray();
+        return {
+          question: userMsg[0]?.content || "(User message not found)",
+          answer: botMsg.content,
+          timestamp: botMsg.timestamp
+        };
+      }));
+      await client.close();
+      res.json({ messages: results });
+    } catch (err) {
+      console.error("Error fetching unanswered messages:", err);
+      res.status(500).json({ error: "Failed to fetch unanswered messages" });
+    }
   });
 
   const httpServer = createServer(app);

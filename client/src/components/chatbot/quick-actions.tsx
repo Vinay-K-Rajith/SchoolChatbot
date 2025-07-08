@@ -1,10 +1,18 @@
-import { GraduationCap, DollarSign, FileText, Phone } from "lucide-react";
+import { GraduationCap, FileText, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface QuickActionsProps {
   onQuickAction: (query: string) => void;
 }
 
+// Replace RupeeIcon with a text-based rupee symbol
+const RupeeIcon = (props: any) => (
+  <span style={{ fontSize: '1rem', fontWeight: 700, lineHeight: 1, display: 'inline-block', ...props?.style }} {...props}>
+    ₹
+  </span>
+);
+
+// Now define quickActions array
 const quickActions = [
   {
     id: "admissions",
@@ -15,7 +23,7 @@ const quickActions = [
   {
     id: "fees",
     label: "Fee Structure",
-    icon: DollarSign,
+    icon: RupeeIcon,
     query: "What is the fee structure and payment rules?",
   },
   {
@@ -34,11 +42,11 @@ const quickActions = [
 
 export function QuickActions({ onQuickAction }: QuickActionsProps) {
   return (
-    <div className="p-2 bg-school-light border-b">
+    <div className="p-2 bg-school-light border-b rounded-2xl">
       <p className="text-sm text-school-deep mb-2 font-medium">
         Quick Actions:
       </p>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-1 sm:gap-2 rounded-xl bg-blue-50 p-2">
         {quickActions.map((action) => {
           const IconComponent = action.icon;
           return (
@@ -47,9 +55,9 @@ export function QuickActions({ onQuickAction }: QuickActionsProps) {
               onClick={() => onQuickAction(action.query)}
               variant="outline"
               size="sm"
-              className="bg-white border-school-blue text-school-blue px-3 py-2 text-xs hover:bg-school-blue hover:text-white transition-colors"
+              className="bg-white border-school-blue text-school-blue px-2 py-2 sm:px-3 text-xs sm:text-sm hover:bg-school-blue hover:text-white transition-colors rounded-lg flex items-center justify-center"
             >
-              <IconComponent className="w-3 h-3 mr-1" />
+              <span className="hidden sm:inline"><IconComponent className="w-3 h-3 mr-1" /></span>
               {action.label}
             </Button>
           );
