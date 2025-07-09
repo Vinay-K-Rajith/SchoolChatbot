@@ -2,7 +2,7 @@ import express, { Request, Response } from "express";
 import { MongoClient } from "mongodb";
 // Replace the import of ApiKeyService with a require statement for ESM compatibility
 // import ApiKeyService from "../services/apiKeyService";
-import ApiKeyService from "../services/apiKeyService.cjs";
+const ApiKeyService = require("../services/apiKeyService.cjs");
 
 const router = express.Router();
 const client = new MongoClient(process.env.MONGODB_URI!);
@@ -40,13 +40,23 @@ router.post("/schools", async (req: Request, res: Response) => {
   // Insert into school_data collection
   await db.collection("school_data").insertOne({
     schoolCode: code,
-    school: { name }
+    school: {
+      name,
+      generalInfo: "",
+      infrastructure: "",
+      fees: "",
+      admissionAndDocuments: "",
+      importantNotes: "",
+      bus: "",
+      links: "",
+      miscellaneous: ""
+    }
   });
 
   res.status(201).json({
     schoolId,
     apiKey,
-    embedCode: `<script src=\"https://yourdomain.com/${code}/inject.js\"></script>`
+    embedCode: `<script src=\"https://chat.entab.net/${code}/inject.js\"></script>`
   });
 });
 
