@@ -96,21 +96,18 @@ export function ChatInterface({ isOpen, onClose, schoolCode }: ChatInterfaceProp
       >
         {/* Header - hidden on mobile */}
         {!isMobile && (
-          <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-2" style={{ background: '#C8CEED' }}>
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between px-4 sm:px-6" style={{ background: 'linear-gradient(90deg, #c8ceed 0%, #b1b7e6 100%)', height: 64, minHeight: 64 }}>
+            <div className="flex items-end gap-2 h-full">
               <img
                 src="/medium-shot-woman-working-as-real-estate-agsdsent.png"
                 alt="Woman working as real estate agent"
-                className="h-12 w-12 rounded-full object-cover mr-3 ring-2 ring-blue-200 shadow-sm"
-                style={{ background: '#fff' }}
+                style={{ height: 56, width: 56, objectFit: 'cover', background: 'transparent', border: 'none', boxShadow: 'none', marginBottom: 0 }}
               />
-              <span className="font-bold text-lg text-blue-900">Felicity</span>
-              <span className="ai-badge flex items-center justify-center px-2 py-0.5 rounded-md bg-white border border-gray-300 shadow text-xs font-bold text-gray-700 ml-1" style={{letterSpacing: 0.5}}>AI</span>
+              <span className="font-bold text-lg text-blue-900 self-end pb-1">Felicity</span>
+              <div style={{ marginLeft: '8px' }}>
+                <span className="ai-badge flex items-center justify-center px-2 py-0.5 rounded-md bg-white border border-gray-300 shadow text-xs font-bold text-gray-700" style={{letterSpacing: 0.5, transform: 'translateY(-6px)'}}>AI</span>
+              </div>
             </div>
-            <button onClick={onClose} className="flex items-center justify-center w-8 h-8 rounded-lg bg-white border border-gray-200 shadow hover:bg-gray-50 transition">
-              <span className="sr-only">Close</span>
-              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 6L14 14M14 6L6 14" stroke="#1e293b" strokeWidth="2" strokeLinecap="round"/></svg>
-            </button>
           </div>
         )}
         {/* Quick Actions (top, no label) - always at top, even on mobile */}

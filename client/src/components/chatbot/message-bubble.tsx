@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import React from "react";
+import Player from 'lottie-react';
 
 interface MessageBubbleProps {
   content: string;
@@ -29,7 +30,7 @@ function linkify(text: string | (string | JSX.Element)[]): (string | JSX.Element
   // Regex for URLs (http, https, www)
   const urlRegex = /((https?:\/\/[^\s<]+)|(www\.[^\s<]+))/gi;
   // Regex for emails
-  const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi;
+  const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z09.-]+\.[a-zA-Z]{2,})/gi;
 
   // Split by URLs and emails in one pass to avoid duplicate rendering
   const parts: (string | JSX.Element)[] = [];
@@ -145,6 +146,16 @@ export function MessageBubble({ content, isUser, timestamp, schoolCode, availabl
   const [directImageUrls, setDirectImageUrls] = useState<string[]>([]);
   // Word-by-word animation state
   const [displayedWords, setDisplayedWords] = useState<string[]>(isUser ? [content] : []);
+  const [botAnimation, setBotAnimation] = useState<any>(null);
+
+  useEffect(() => {
+    if (!isUser) {
+      fetch('/static/Animation-1751969781201.json')
+        .then(res => res.json())
+        .then(setBotAnimation)
+        .catch(() => setBotAnimation(null));
+    }
+  }, [isUser]);
 
   useEffect(() => {
     if (isUser) {
@@ -226,10 +237,19 @@ export function MessageBubble({ content, isUser, timestamp, schoolCode, availabl
   }, [content, schoolCode, directImageUrls, displayedWords, isUser]);
 
   return (
-    <div className={`flex items-start space-x-3 animate-fade-in ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`}>
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0 ${isUser ? 'bg-school-orange' : 'bg-school-blue'}`}>
-        {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-      </div>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} w-full`}>
+      {!isUser && (
+        <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+          {botAnimation && (
+            <Player
+              autoplay
+              loop
+              animationData={botAnimation}
+              style={{ height: 32, width: 32 }}
+            />
+          )}
+        </div>
+      )}
       <div className={`rounded-2xl p-4 max-w-[98%] ${isUser ? 'bg-school-blue text-white rounded-tr-sm' : 'bg-gray-50 rounded-tl-sm border border-gray-200'}`}>
         <div className={`text-sm leading-relaxed ${isUser ? 'text-white' : 'text-gray-800'}`}>
           {formattedContent}

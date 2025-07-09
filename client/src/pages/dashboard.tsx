@@ -31,6 +31,7 @@ import { MessageBubble } from "../components/chatbot/message-bubble";
 import TextField from '@mui/material/TextField';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
+import { ChevronDown, ChevronUp, Save, Info, Building, DollarSign, FileText, AlertCircle, Bus, Link, Settings } from 'lucide-react';
 
 const timeframes = ["Hourly", "Daily", "Weekly", "Monthly", "Yearly"];
 
@@ -51,7 +52,7 @@ function MetricsCard({ label, value, icon, color }: { label: string; value: stri
 function Sidebar({ schoolName, schoolCode, tab, setTab }: { schoolName: string; schoolCode: string; tab: string; setTab: (t: string) => void }) {
   const nav = [
     { key: "dashboard", label: "Dashboard", icon: <HomeIcon /> },
-    { key: "analytics", label: "Analytics", icon: <BarChartIcon /> },
+    // Removed Analytics tab
     { key: "kb", label: "Knowledge Base", icon: <MenuBookIcon /> },
     { key: "chat", label: "Chat History", icon: <MenuBookIcon /> },
   ];
@@ -172,21 +173,14 @@ export default function Dashboard() {
       }
       fetch(url).then(r => r.json()).then(d => setChatSessions(d.sessions || []));
     }
-    if (tab === 'kb') {
-      setFormattedKbLoading(true);
-      fetch(`/api/school/${schoolCode}/knowledge-base-formatted`)
-        .then(r => r.json())
-        .then(data => setFormattedKb(data.formatted || ""))
-        .catch(() => setFormattedKb("Failed to load formatted knowledge base."))
-        .finally(() => setFormattedKbLoading(false));
-    }
   }, [schoolCode, tab, dateRange, authStatus]);
 
   useEffect(() => {
-    fetch(`/api/school/${schoolCode}/analytics?timeframe=${timeframe.toLowerCase()}`)
+    if (authStatus !== 'success') return;
+    fetch(`/api/school/${schoolCode}/daily-usage`)
       .then(r => r.json())
-      .then(d => setAnalyticsData(d.data || []));
-  }, [schoolCode, timeframe]);
+      .then(d => setAnalyticsData(d.usage || []));
+  }, [schoolCode, authStatus]);
 
   const handleKbSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -250,7 +244,7 @@ export default function Dashboard() {
       <Box sx={{ flex: 1, px: 5, py: 4, ml: '220px' }}>
         {/* Top Bar */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-          <Typography variant="h6" fontWeight={700} color="#0a2540">{schoolName} {tab === "dashboard" ? "Dashboard" : tab === "analytics" ? "Analytics" : tab === "chat" ? "Chat History" : "Knowledge Base"}</Typography>
+          <Typography variant="h6" fontWeight={700} color="#0a2540">{schoolName} {tab === "dashboard" ? "Dashboard" : tab === "chat" ? "Chat History" : "Knowledge Base"}</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <InputBase sx={{ bgcolor: 'white', px: 2, py: 0.5, borderRadius: 2, fontSize: 15, width: 180, border: '1px solid #dbeafe' }} placeholder="Search..." />
             <Avatar sx={{ bgcolor: '#b3c2d6', color: '#0a2540', width: 36, height: 36, fontWeight: 700 }}>{schoolName[0]}</Avatar>
@@ -265,29 +259,20 @@ export default function Dashboard() {
           </Box>
         )}
         {/* Analytics Graph */}
-        {(tab === "dashboard" || tab === "analytics") && (
+        {tab === "dashboard" && (
           <Card sx={{ borderRadius: 3, boxShadow: 1, bgcolor: 'white', maxWidth: 700, mx: 'auto', mb: 4 }}>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                <Typography fontWeight={500} color="text.secondary">Timeframe:</Typography>
-                <select
-                  style={{ border: '1px solid #e0e7ef', borderRadius: 6, padding: '4px 10px', background: '#f3f8fd', fontSize: 15 }}
-                  value={timeframe}
-                  onChange={e => setTimeframe(e.target.value)}
-                >
-                  {timeframes.map(tf => (
-                    <option key={tf} value={tf}>{tf}</option>
-                  ))}
-                </select>
+              <Box sx={{ mb: 2 }}>
+                <Typography fontWeight={500} color="text.secondary">Daily Messages (Last 30 Days)</Typography>
               </Box>
               <Box sx={{ width: '100%', height: 320 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={analyticsData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="label" />
+                    <XAxis dataKey="date" />
                     <YAxis allowDecimals={false} />
                     <Tooltip />
-                    <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                    <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </Box>
@@ -297,71 +282,13 @@ export default function Dashboard() {
         {/* Knowledge Base Editor */}
         {tab === "kb" && (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', minHeight: '60vh', bgcolor: '#eaf1fb', py: 6 }}>
-            <Box sx={{ display: 'flex', flexDirection: 'row', bgcolor: 'white', borderRadius: 3, boxShadow: 1, maxWidth: 1200, width: '100%', mx: 2, p: 4, gap: 4 }}>
-              {/* Current Knowledge Base */}
-              <Box sx={{ flex: 1, minWidth: 0, borderRight: { md: '1px solid #e0e7ef' }, pr: { md: 4 }, mb: { xs: 3, md: 0 } }}>
-                <Typography variant="h5" fontWeight={700} mb={2}>Current Knowledge Base</Typography>
-                {formattedKbLoading ? (
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 120 }}>
-                    <CircularProgress />
-                  </Box>
-                ) : formattedKb ? (
-                  <Box sx={{ bgcolor: '#f3f8fd', borderRadius: 2, p: 2, fontSize: 16, minHeight: 180, maxHeight: 350, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
-                    <div dangerouslySetInnerHTML={{ __html: formattedKb.replace(/\n/g, '<br/>') }} />
-                  </Box>
-                ) : (
-                  <Typography color="text.secondary">No knowledge base found for this school.</Typography>
-                )}
-              </Box>
-              {/* Update Form */}
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="h5" fontWeight={700} mb={2}>Update Knowledge Base</Typography>
-                <form className="space-y-4" onSubmit={handleKbSubmit}>
-                  <TextField
-                    label="Text Input"
-                    multiline
-                    minRows={4}
-                    fullWidth
-                    value={kbInput}
-                    onChange={e => setKbInput(e.target.value)}
-                    placeholder="Enter knowledge base text..."
-                    variant="outlined"
-                    sx={{ mb: 2 }}
-                  />
-                  <Box sx={{ mb: 2 }}>
-                    <Typography fontWeight={500} mb={0.5}>Upload Image</Typography>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      style={{ display: 'block', marginBottom: 8 }}
-                      onChange={e => setKbImage(e.target.files?.[0] || null)}
-                    />
-                    {kbImage && (
-                      <Box sx={{ position: 'relative', display: 'inline-block', mb: 1 }}>
-                        <img
-                          src={URL.createObjectURL(kbImage)}
-                          alt="Preview"
-                          style={{ maxWidth: 120, maxHeight: 120, borderRadius: 8, border: '1px solid #e0e7ef' }}
-                        />
-                        <Button size="small" color="error" sx={{ position: 'absolute', top: 0, right: 0, minWidth: 0, p: 0.5 }} onClick={() => setKbImage(null)}>Remove</Button>
-                      </Box>
-                    )}
-                  </Box>
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    color="primary"
-                    disabled={loading || !kbInput.trim()}
-                    sx={{ minWidth: 180, fontWeight: 600 }}
-                  >
-                    {loading ? <CircularProgress size={22} color="inherit" /> : "Update Knowledge Base"}
-                  </Button>
-                  {kbResult && (
-                    <Alert severity={kbResult.toLowerCase().includes('fail') ? 'error' : 'success'} sx={{ mt: 2 }}>{kbResult}</Alert>
-                  )}
-                </form>
-              </Box>
-            </Box>
+            <div className="max-w-6xl mx-auto p-6 bg-white min-h-screen w-full">
+              <div className="mb-8">
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">School Data Editor</h1>
+                <p className="text-gray-600">Update your school information across all sections</p>
+              </div>
+              <KnowledgeBaseSectionedEditor schoolCode={schoolCode} />
+            </div>
           </Box>
         )}
         {/* Chat History Tab */}
@@ -457,5 +384,199 @@ export default function Dashboard() {
         )}
       </Box>
     </Box>
+  );
+}
+
+function KnowledgeBaseSectionedEditor({ schoolCode }: { schoolCode: string }) {
+  type KBSectionKey = 'generalInfo' | 'infrastructure' | 'fees' | 'admissionAndDocuments' | 'importantNotes' | 'bus' | 'links' | 'miscellaneous';
+  const [expandedSections, setExpandedSections] = useState<Record<KBSectionKey, boolean>>({
+    generalInfo: true,
+    infrastructure: false,
+    fees: false,
+    admissionAndDocuments: false,
+    importantNotes: false,
+    bus: false,
+    links: false,
+    miscellaneous: false
+  });
+  const [fields, setFields] = useState<Record<KBSectionKey, string>>({
+    generalInfo: '',
+    infrastructure: '',
+    fees: '',
+    admissionAndDocuments: '',
+    importantNotes: '',
+    bus: '',
+    links: '',
+    miscellaneous: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/school/${schoolCode}`)
+      .then(res => res.json())
+      .then(data => {
+        setFields({
+          generalInfo: data.generalInfo || '',
+          infrastructure: data.infrastructure || '',
+          fees: data.fees || '',
+          admissionAndDocuments: data.admissionAndDocuments || '',
+          importantNotes: data.importantNotes || '',
+          bus: data.bus || '',
+          links: data.links || '',
+          miscellaneous: data.miscellaneous || ''
+        });
+        setLoading(false);
+      })
+      .catch(() => {
+        setError('Failed to load school data.');
+        setLoading(false);
+      });
+  }, [schoolCode]);
+
+  const handleChange = (key: KBSectionKey, value: string) => {
+    setFields(f => ({ ...f, [key]: value }));
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    setSuccess(null);
+    setError(null);
+    try {
+      const res = await fetch(`/api/school/${schoolCode}/knowledge-base`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fields)
+      });
+      const json = await res.json();
+      if (json.success) {
+        setSuccess('Changes saved successfully!');
+      } else {
+        setError(json.error || 'Failed to save changes.');
+      }
+    } catch (e) {
+      setError('Failed to save changes.');
+    }
+    setLoading(false);
+  };
+
+  const toggleSection = (section: KBSectionKey) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const SectionHeader = ({ title, section, icon }: { title: string; section: KBSectionKey; icon: React.ReactNode }) => (
+    <div
+      className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200 cursor-pointer hover:from-blue-100 hover:to-indigo-100 transition-all duration-200"
+      onClick={() => toggleSection(section)}
+    >
+      <div className="flex items-center space-x-3">
+        <div className="p-2 bg-blue-100 rounded-lg">
+          {icon}
+        </div>
+        <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+      </div>
+      {expandedSections[section] ?
+        <ChevronUp className="w-5 h-5 text-blue-600" /> :
+        <ChevronDown className="w-5 h-5 text-blue-600" />
+      }
+    </div>
+  );
+
+  const sections: { key: KBSectionKey; title: string; icon: React.ReactNode; placeholder: string }[] = [
+    {
+      key: 'generalInfo',
+      title: 'General Information',
+      icon: <Info className="w-5 h-5 text-blue-600" />,
+      placeholder: 'Enter general information about the school including basic details, contact information, mission statement, facilities, etc.'
+    },
+    {
+      key: 'infrastructure',
+      title: 'Infrastructure',
+      icon: <Building className="w-5 h-5 text-blue-600" />,
+      placeholder: 'Enter infrastructure details including campus area, classrooms, laboratories, library, sports facilities, etc.'
+    },
+    {
+      key: 'fees',
+      title: 'Fee Structure',
+      icon: <DollarSign className="w-5 h-5 text-blue-600" />,
+      placeholder: 'Enter fee structure including registration fees, tuition fees, transport charges, payment terms, etc.'
+    },
+    {
+      key: 'admissionAndDocuments',
+      title: 'Admission & Documents',
+      icon: <FileText className="w-5 h-5 text-blue-600" />,
+      placeholder: 'Enter admission process details, required documents, application procedures, contact information, etc.'
+    },
+    {
+      key: 'importantNotes',
+      title: 'Important Notes',
+      icon: <AlertCircle className="w-5 h-5 text-blue-600" />,
+      placeholder: 'Enter important policies, guidelines, discipline rules, academic policies, special instructions, etc.'
+    },
+    {
+      key: 'bus',
+      title: 'Transportation',
+      icon: <Bus className="w-5 h-5 text-blue-600" />,
+      placeholder: 'Enter transportation details including bus routes, coverage areas, transport guidelines, contact information, etc.'
+    },
+    {
+      key: 'links',
+      title: 'Important Links',
+      icon: <Link className="w-5 h-5 text-blue-600" />,
+      placeholder: 'Enter important links including online portals, fee payment links, results portal, parent portal, resources, etc.'
+    },
+    {
+      key: 'miscellaneous',
+      title: 'Miscellaneous',
+      icon: <Settings className="w-5 h-5 text-blue-600" />,
+      placeholder: 'Enter miscellaneous information including awards, recognitions, partnerships, special programs, additional information, etc.'
+    }
+  ];
+
+  return (
+    <>
+      {loading && <div className="text-center py-4 text-blue-600">Loading...</div>}
+      {error && <div className="text-center py-2 text-red-600">{error}</div>}
+      {success && <div className="text-center py-2 text-green-600">{success}</div>}
+      <div className="space-y-6">
+        {sections.map(section => (
+          <div key={section.key} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <SectionHeader
+              title={section.title}
+              section={section.key}
+              icon={section.icon}
+            />
+            {expandedSections[section.key] && (
+              <div className="p-6">
+                <textarea
+                  placeholder={section.placeholder}
+                  rows={12}
+                  value={fields[section.key]}
+                  onChange={e => handleChange(section.key, e.target.value)}
+                  className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none text-sm leading-relaxed"
+                  disabled={loading}
+                />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {/* Save Button */}
+      <div className="mt-8 flex justify-center">
+        <button
+          className="flex items-center space-x-2 px-8 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+          onClick={handleSave}
+          disabled={loading}
+        >
+          <Save className="w-5 h-5" />
+          <span>{loading ? 'Saving...' : 'Save Changes'}</span>
+        </button>
+      </div>
+    </>
   );
 } 

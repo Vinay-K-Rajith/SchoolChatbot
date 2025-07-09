@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { Plus, School, BarChart3, List, ChevronDown, ChevronUp, Users, BookOpen, Award, MapPin, Settings, LogOut, Bell, Search, User, MessageSquare, Key, FileText, AlertCircle } from 'lucide-react';
+import { Plus, School, BarChart3, List, ChevronDown, ChevronUp, Users, BookOpen, Award, MapPin, Settings, LogOut, Bell, Search, User, MessageSquare, Key, FileText, AlertCircle, Info, Building, DollarSign, Bus, Link, Save } from 'lucide-react';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -118,11 +118,9 @@ export default function SchoolAdminDashboard() {
     setSchoolLoading(true);
     Promise.all([
       fetch(`/api/school/${selectedSchoolCode}/metrics`).then(r => r.json()),
-      fetch(`/api/school/${selectedSchoolCode}/knowledge-base-formatted`).then(r => r.json()),
       fetch(`/api/school/${selectedSchoolCode}/sessions`).then(r => r.json())
-    ]).then(([metrics, kb, sessions]) => {
+    ]).then(([metrics, sessions]) => {
       setSchoolMetrics(metrics);
-      setSchoolKnowledgeBase(kb.formatted || "");
       setSchoolSessions(sessions.sessions || []);
       setSchoolLoading(false);
     }).catch(err => {
@@ -665,16 +663,14 @@ export default function SchoolAdminDashboard() {
   const renderKnowledgeBase = () => (
     !selectedSchoolCode ? (
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 text-center">
-        <p className="text-gray-500">Please select a school to view the knowledge base.</p>
+        <p className="text-gray-500">Please select a school to view and edit the knowledge base.</p>
       </div>
-    ) : schoolLoading ? (
-      <div className="flex items-center justify-center h-32"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
     ) : (
       <div className="space-y-6">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Knowledge Base</h3>
-          <p className="text-sm text-gray-500 mb-6">Knowledge base for <b>{selectedSchoolName}</b>:</p>
-          <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: schoolKnowledgeBase }} />
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Knowledge Base Editor</h3>
+          <p className="text-sm text-gray-500 mb-6">Edit the knowledge base for <b>{selectedSchoolName}</b>:</p>
+          <KnowledgeBaseSectionedEditor schoolCode={selectedSchoolCode} />
         </div>
       </div>
     )
@@ -1079,5 +1075,199 @@ export default function SchoolAdminDashboard() {
         </div>
       </div>
     </div>
+  );
+} 
+
+function KnowledgeBaseSectionedEditor({ schoolCode }: { schoolCode: string }) {
+  type KBSectionKey = 'generalInfo' | 'infrastructure' | 'fees' | 'admissionAndDocuments' | 'importantNotes' | 'bus' | 'links' | 'miscellaneous';
+  const [expandedSections, setExpandedSections] = React.useState<Record<KBSectionKey, boolean>>({
+    generalInfo: true,
+    infrastructure: false,
+    fees: false,
+    admissionAndDocuments: false,
+    importantNotes: false,
+    bus: false,
+    links: false,
+    miscellaneous: false
+  });
+  const [fields, setFields] = React.useState<Record<KBSectionKey, string>>({
+    generalInfo: '',
+    infrastructure: '',
+    fees: '',
+    admissionAndDocuments: '',
+    importantNotes: '',
+    bus: '',
+    links: '',
+    miscellaneous: ''
+  });
+  const [loading, setLoading] = React.useState(false);
+  const [success, setSuccess] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setLoading(true);
+    fetch(`/api/school/${schoolCode}`)
+      .then(res => res.json())
+      .then(data => {
+        setFields({
+          generalInfo: data.generalInfo || '',
+          infrastructure: data.infrastructure || '',
+          fees: data.fees || '',
+          admissionAndDocuments: data.admissionAndDocuments || '',
+          importantNotes: data.importantNotes || '',
+          bus: data.bus || '',
+          links: data.links || '',
+          miscellaneous: data.miscellaneous || ''
+        });
+        setLoading(false);
+      })
+      .catch(() => {
+        setError('Failed to load school data.');
+        setLoading(false);
+      });
+  }, [schoolCode]);
+
+  const handleChange = (key: KBSectionKey, value: string) => {
+    setFields(f => ({ ...f, [key]: value }));
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    setSuccess(null);
+    setError(null);
+    try {
+      const res = await fetch(`/api/school/${schoolCode}/knowledge-base`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fields)
+      });
+      const json = await res.json();
+      if (json.success) {
+        setSuccess('Changes saved successfully!');
+      } else {
+        setError(json.error || 'Failed to save changes.');
+      }
+    } catch (e) {
+      setError('Failed to save changes.');
+    }
+    setLoading(false);
+  };
+
+  const toggleSection = (section: KBSectionKey) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const SectionHeader = ({ title, section, icon }: { title: string; section: KBSectionKey; icon: React.ReactNode }) => (
+    <div
+      className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200 cursor-pointer hover:from-blue-100 hover:to-indigo-100 transition-all duration-200"
+      onClick={() => toggleSection(section)}
+    >
+      <div className="flex items-center space-x-3">
+        <div className="p-2 bg-blue-100 rounded-lg">
+          {icon}
+        </div>
+        <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+      </div>
+      {expandedSections[section] ?
+        <ChevronUp className="w-5 h-5 text-blue-600" /> :
+        <ChevronDown className="w-5 h-5 text-blue-600" />
+      }
+    </div>
+  );
+
+  const sections: { key: KBSectionKey; title: string; icon: React.ReactNode; placeholder: string }[] = [
+    {
+      key: 'generalInfo',
+      title: 'General Information',
+      icon: <Info className="w-5 h-5 text-blue-600" />,
+      placeholder: 'Enter general information about the school including basic details, contact information, mission statement, facilities, etc.'
+    },
+    {
+      key: 'infrastructure',
+      title: 'Infrastructure',
+      icon: <Building className="w-5 h-5 text-blue-600" />,
+      placeholder: 'Enter infrastructure details including campus area, classrooms, laboratories, library, sports facilities, etc.'
+    },
+    {
+      key: 'fees',
+      title: 'Fee Structure',
+      icon: <DollarSign className="w-5 h-5 text-blue-600" />,
+      placeholder: 'Enter fee structure including registration fees, tuition fees, transport charges, payment terms, etc.'
+    },
+    {
+      key: 'admissionAndDocuments',
+      title: 'Admission & Documents',
+      icon: <FileText className="w-5 h-5 text-blue-600" />,
+      placeholder: 'Enter admission process details, required documents, application procedures, contact information, etc.'
+    },
+    {
+      key: 'importantNotes',
+      title: 'Important Notes',
+      icon: <AlertCircle className="w-5 h-5 text-blue-600" />,
+      placeholder: 'Enter important policies, guidelines, discipline rules, academic policies, special instructions, etc.'
+    },
+    {
+      key: 'bus',
+      title: 'Transportation',
+      icon: <Bus className="w-5 h-5 text-blue-600" />,
+      placeholder: 'Enter transportation details including bus routes, coverage areas, transport guidelines, contact information, etc.'
+    },
+    {
+      key: 'links',
+      title: 'Important Links',
+      icon: <Link className="w-5 h-5 text-blue-600" />,
+      placeholder: 'Enter important links including online portals, fee payment links, results portal, parent portal, resources, etc.'
+    },
+    {
+      key: 'miscellaneous',
+      title: 'Miscellaneous',
+      icon: <Settings className="w-5 h-5 text-blue-600" />,
+      placeholder: 'Enter miscellaneous information including awards, recognitions, partnerships, special programs, additional information, etc.'
+    }
+  ];
+
+  return (
+    <>
+      {loading && <div className="text-center py-4 text-blue-600">Loading...</div>}
+      {error && <div className="text-center py-2 text-red-600">{error}</div>}
+      {success && <div className="text-center py-2 text-green-600">{success}</div>}
+      <div className="space-y-6">
+        {sections.map(section => (
+          <div key={section.key} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <SectionHeader
+              title={section.title}
+              section={section.key}
+              icon={section.icon}
+            />
+            {expandedSections[section.key] && (
+              <div className="p-6">
+                <textarea
+                  placeholder={section.placeholder}
+                  rows={12}
+                  value={fields[section.key]}
+                  onChange={e => handleChange(section.key, e.target.value)}
+                  className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none text-sm leading-relaxed"
+                  disabled={loading}
+                />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {/* Save Button */}
+      <div className="mt-8 flex justify-center">
+        <button
+          className="flex items-center space-x-2 px-8 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+          onClick={handleSave}
+          disabled={loading}
+        >
+          <Save className="w-5 h-5" />
+          <span>{loading ? 'Saving...' : 'Save Changes'}</span>
+        </button>
+      </div>
+    </>
   );
 } 
