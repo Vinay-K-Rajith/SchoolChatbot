@@ -37,7 +37,7 @@ var require_apiKeyService = __commonJS({
     var crypto = __require("crypto");
     var { MongoClient: MongoClient4, ObjectId: ObjectId2 } = __require("mongodb");
     var client3 = new MongoClient4(process.env.MONGODB_URI);
-    var ApiKeyService2 = class {
+    var ApiKeyService = class {
       static generateApiKey(schoolId) {
         return `sk_${schoolId}_${crypto.randomBytes(32).toString("hex")}`;
       }
@@ -65,7 +65,7 @@ var require_apiKeyService = __commonJS({
         return this.createApiKeyForSchool(schoolId);
       }
     };
-    module.exports = ApiKeyService2;
+    module.exports = ApiKeyService;
   }
 });
 
@@ -253,12 +253,12 @@ import dotenv3 from "dotenv";
 import cookieParser from "cookie-parser";
 
 // server/routes/adminSchools.ts
-var import_apiKeyService = __toESM(require_apiKeyService(), 1);
 import express from "express";
 import { MongoClient as MongoClient2 } from "mongodb";
 var router = express.Router();
 var client2 = new MongoClient2(process.env.MONGODB_URI);
 router.post("/schools", async (req, res) => {
+  const ApiKeyService = (await Promise.resolve().then(() => __toESM(require_apiKeyService(), 1))).default || await Promise.resolve().then(() => __toESM(require_apiKeyService(), 1));
   const { code, name, geminiApiKey } = req.body;
   if (!code || !name || !geminiApiKey) {
     return res.status(400).json({ error: "All fields required" });
@@ -277,19 +277,29 @@ router.post("/schools", async (req, res) => {
   };
   const schoolResult = await db.collection("schools").insertOne(schoolDoc);
   const schoolId = schoolResult.insertedId;
-  const { apiKey, apiSecret } = await import_apiKeyService.default.createApiKeyForSchool(schoolId.toString());
+  const { apiKey, apiSecret } = await ApiKeyService.createApiKeyForSchool(schoolId.toString());
   await db.collection("schools").updateOne(
     { _id: schoolId },
     { $set: { api_key: apiKey, api_secret: apiSecret } }
   );
   await db.collection("school_data").insertOne({
     schoolCode: code,
-    school: { name }
+    school: {
+      name,
+      generalInfo: "",
+      infrastructure: "",
+      fees: "",
+      admissionAndDocuments: "",
+      importantNotes: "",
+      bus: "",
+      links: "",
+      miscellaneous: ""
+    }
   });
   res.status(201).json({
     schoolId,
     apiKey,
-    embedCode: `<script src="https://yourdomain.com/${code}/inject.js"></script>`
+    embedCode: `<script src="https://chat.entab.net/${code}/inject.js"></script>`
   });
 });
 router.get("/schools", async (_req, res) => {

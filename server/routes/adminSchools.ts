@@ -1,14 +1,16 @@
 import express, { Request, Response } from "express";
 import { MongoClient } from "mongodb";
-// Replace the import of ApiKeyService with a require statement for ESM compatibility
-// import ApiKeyService from "../services/apiKeyService";
-const ApiKeyService = require("../services/apiKeyService.cjs");
+// Remove the top-level require for ApiKeyService (ESM compatibility)
+// const ApiKeyService = require("../services/apiKeyService.cjs");
 
 const router = express.Router();
 const client = new MongoClient(process.env.MONGODB_URI!);
 
 // Create a new school/project
 router.post("/schools", async (req: Request, res: Response) => {
+  // Dynamically import ApiKeyService (CommonJS) in ESM context
+  // @ts-ignore
+  const ApiKeyService = (await import("../services/apiKeyService.cjs")).default || (await import("../services/apiKeyService.cjs"));
   const { code, name, geminiApiKey } = req.body;
   if (!code || !name || !geminiApiKey) {
     return res.status(400).json({ error: "All fields required" });
